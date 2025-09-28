@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste API Register</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .success {
+            background-color: #e8f5e8;
+            border-color: #4caf50;
+        }
+        .error {
+            background-color: #ffebee;
+            border-color: #f44336;
+        }
+        button {
+            background-color: #132c0d;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background-color: #0f2410;
+        }
+        pre {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        .loading {
+            color: #666;
+            font-style: italic;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Teste do Endpoint de Cadastro</h1>
+        <p>Este teste verifica se o endpoint <code>http://127.0.0.1:8000/api/v1/register</code> está funcionando.</p>
+        
+        <div class="test-section">
+            <h3>1. Teste Rápido de Cadastro</h3>
+            <button onclick="testQuickRegister()">Testar Cadastro Rápido</button>
+            <div id="quick-result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>2. Teste de Cadastro Personalizado</h3>
+            <form id="custom-form">
+                <div class="form-group">
+                    <label for="name">Nome:</label>
+                    <input type="text" id="name" value="Usuário Teste" required>
+                </div>
+                <div class="form-group">
+                    <label for="email">Email:</label>
+                    <input type="email" id="email" value="teste@exemplo.com" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">Senha:</label>
+                    <input type="password" id="password" value="12345678" required>
+                </div>
+                <div class="form-group">
+                    <label for="password_confirmation">Confirmar Senha:</label>
+                    <input type="password" id="password_confirmation" value="12345678" required>
+                </div>
+                <div class="form-group">
+                    <label for="nivel_acesso">Nível de Acesso:</label>
+                    <select id="nivel_acesso" required>
+                        <option value="usuario">Usuário</option>
+                        <option value="admin">Administrador</option>
+                        <option value="exata" selected>Exata</option>
+                        <option value="sabesp">SABESP</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="divisao_id">Divisão ID (opcional):</label>
+                    <input type="number" id="divisao_id" value="1">
+                </div>
+                <button type="button" onclick="testCustomRegister()">Testar Cadastro Personalizado</button>
+            </form>
+            <div id="custom-result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>3. Teste de Validação</h3>
+            <button onclick="testValidation()">Testar Validações</button>
+            <div id="validation-result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>4. Verificar Usuários Cadastrados</h3>
+            <button onclick="checkUsers()">Listar Usuários</button>
+            <div id="users-result"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://127.0.0.1:8000/api/v1';
+        
+        async function testQuickRegister() {
+            const resultDiv = document.getElementById('quick-result');
+            resultDiv.innerHTML = '<div class="loading">Testando cadastro rápido...</div>';
+            
+            try {
+                const testUser = {
+                    name: 'Teste Rápido',
+                    email: `teste${Date.now()}@exemplo.com`,
+                    password: '12345678',
+                    password_confirmation: '12345678',
+                    nivel_acesso: 'exata',
+                    divisao_id: 1
+                };
+                
+                const response = await fetch(`${API_BASE}/register`, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(testUser)
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `
+                        <div class="success">
+                            <strong>✅ Cadastro realizado com sucesso!</strong><br>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="error">
+                            <strong>❌ Erro no cadastro</strong><br>
+                            Status: ${response.status}<br>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        <strong>❌ Erro de rede</strong><br>
+                        ${error.message}
+                    </div>
+                `;
+            }
+        }
+        
+        async function testCustomRegister() {
+            const resultDiv = document.getElementById('custom-result');
+            resultDiv.innerHTML = '<div class="loading">Testando cadastro personalizado...</div>';
+            
+            try {
+                const userData = {
+                    name: document.getElementById('name').value,
+                    email: document.getElementById('email').value,
+                    password: document.getElementById('password').value,
+                    password_confirmation: document.getElementById('password_confirmation').value,
+                    nivel_acesso: document.getElementById('nivel_acesso').value,
+                    divisao_id: document.getElementById('divisao_id').value ? parseInt(document.getElementById('divisao_id').value) : null
+                };
+                
+                const response = await fetch(`${API_BASE}/register`, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(userData)
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `
+                        <div class="success">
+                            <strong>✅ Cadastro personalizado realizado com sucesso!</strong><br>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="error">
+                            <strong>❌ Erro no cadastro personalizado</strong><br>
+                            Status: ${response.status}<br>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        <strong>❌ Erro de rede</strong><br>
+                        ${error.message}
+                    </div>
+                `;
+            }
+        }
+        
+        async function testValidation() {
+            const resultDiv = document.getElementById('validation-result');
+            resultDiv.innerHTML = '<div class="loading">Testando validações...</div>';
+            
+            const tests = [
+                { name: 'Email duplicado', data: { name: 'Teste', email: 'teste@exemplo.com', password: '12345678', password_confirmation: '12345678', nivel_acesso: 'usuario' } },
+                { name: 'Email inválido', data: { name: 'Teste', email: 'email-invalido', password: '12345678', password_confirmation: '12345678', nivel_acesso: 'usuario' } },
+                { name: 'Senha muito curta', data: { name: 'Teste', email: 'teste2@exemplo.com', password: '123', password_confirmation: '123', nivel_acesso: 'usuario' } },
+                { name: 'Senhas não coincidem', data: { name: 'Teste', email: 'teste3@exemplo.com', password: '12345678', password_confirmation: '87654321', nivel_acesso: 'usuario' } },
+                { name: 'Nível de acesso inválido', data: { name: 'Teste', email: 'teste4@exemplo.com', password: '12345678', password_confirmation: '12345678', nivel_acesso: 'invalido' } },
+                { name: 'Campos obrigatórios ausentes', data: { name: '', email: 'teste5@exemplo.com', password: '12345678', password_confirmation: '12345678', nivel_acesso: 'usuario' } }
+            ];
+            
+            let results = [];
+            
+            for (const test of tests) {
+                try {
+                    const response = await fetch(`${API_BASE}/register`, {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(test.data)
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (response.ok) {
+                        results.push(`❌ ${test.name}: Deveria ter falhado, mas passou`);
+                    } else {
+                        results.push(`✅ ${test.name}: Falhou corretamente (${response.status})`);
+                    }
+                } catch (error) {
+                    results.push(`❌ ${test.name}: Erro de rede - ${error.message}`);
+                }
+            }
+            
+            resultDiv.innerHTML = `
+                <div class="success">
+                    <strong>Resultados dos Testes de Validação:</strong><br>
+                    <pre>${results.join('\n')}</pre>
+                </div>
+            `;
+        }
+        
+        async function checkUsers() {
+            const resultDiv = document.getElementById('users-result');
+            resultDiv.innerHTML = '<div class="loading">Buscando usuários...</div>';
+            
+            try {
+                const response = await fetch(`${API_BASE}/users`, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `
+                        <div class="success">
+                            <strong>✅ Usuários encontrados: ${Array.isArray(data) ? data.length : (data.data ? data.data.length : 'N/A')}</strong><br>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="error">
+                            <strong>❌ Erro ao buscar usuários</strong><br>
+                            Status: ${response.status}<br>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        <strong>❌ Erro de rede</strong><br>
+                        ${error.message}
+                    </div>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>

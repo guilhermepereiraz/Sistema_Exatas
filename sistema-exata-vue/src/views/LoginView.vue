@@ -1,27 +1,64 @@
 <script setup>
-import { ref } from 'vue';
+import { ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { authService } from '../services/auth'
 
+const router = useRouter()
+
+// Dados do formulário de login
 const email = ref('')
 const password = ref('')
 
-const codigoRecuperacao = ref('')
-const novaSenha = ref('')
-const confirmarNovaSenha = ref('')
-const emailRecuperacao = ref('')
+// Estados da interface do usuário
+const isLoading = ref(false) // Controla estado de carregamento
+const errorMessage = ref('') // Mensagem de erro exibida ao usuário
 
-const modo = ref('login') 
+// Validação do formulário
+const isFormValid = ref(false) // Indica se o formulário está válido para envio
 
-function fazerLogin() {
-  console.log('Tentativa de login com:')
-  console.log('E-mail:', email.value)
-  console.log('Senha:', password.value)
+// Valida o formulário em tempo real
+const validateForm = () => {
+  isFormValid.value = email.value.trim() !== '' && password.value.trim() !== ''
 }
 
+// Função principal de login
+async function fazerLogin() {
+  // Verifica se o formulário está válido antes de prosseguir
+  if (!isFormValid.value) return
+  
+  // Ativa estado de carregamento e limpa mensagens de erro
+  isLoading.value = true
+  errorMessage.value = ''
+  
+  try {
+    // Prepara credenciais para envio
+    const credentials = {
+      email: email.value.trim(),
+      password: password.value
+    }
+    
+    console.log('Tentando fazer login com:', credentials)
+    const response = await authService.login(credentials)
+    console.log('Resposta do login:', response)
+    
+    // Redireciona para o dashboard após login bem-sucedido
+    router.push('/dashboard')
+    
+  } catch (error) {
+    console.error('Erro no login:', error)
+    // Exibe mensagem de erro para o usuário
+    errorMessage.value = error.message || 'Erro ao fazer login. Tente novamente.'
+  } finally {
+    // Desativa estado de carregamento independente do resultado
+    isLoading.value = false
+  }
+}
+
+// Função para recuperação de senha (a ser implementada)
 function recuperarSenha() {
-  console.log('Iniciando recuperação para o e-mail:', emailRecuperacao.value);
+  // TODO: Implementar modal de recuperação de senha ou redirecionamento
+  console.log('Recuperação de senha ainda não implementada')
 }
-
-
 </script>
 
 <template>
@@ -33,6 +70,11 @@ function recuperarSenha() {
 
       <div class="input-container">
         <form @submit.prevent="fazerLogin">
+          <!-- Error message -->
+          <div v-if="errorMessage" class="error-message">
+            {{ errorMessage }}
+          </div>
+
           <div class="campo-flutuante">
             <input
               type="email"
@@ -42,6 +84,8 @@ function recuperarSenha() {
               placeholder=" "
               required
               v-model="email"
+              @input="validateForm"
+              :disabled="isLoading"
             />
             <label for="email" class="label-flutuante">E-mail</label>
           </div>
@@ -55,19 +99,29 @@ function recuperarSenha() {
               placeholder=" "
               required
               v-model="password"
+              @input="validateForm"
+              :disabled="isLoading"
             />
             <label for="password" class="label-flutuante">Senha</label>
           </div>
 
-          <p>Esqueci minha senha</p>
-          <button type="submit" class="buttonentre" id="entrar"   >Entrar</button>
+          <p @click="recuperarSenha" class="forgot-password">Esqueci minha senha</p>
+          <button 
+            type="submit" 
+            class="buttonentre" 
+            :class="{ 'ativo': isFormValid && !isLoading }"
+            :disabled="!isFormValid || isLoading"
+          >
+            <span v-if="isLoading">Entrando...</span>
+            <span v-else>Entrar</span>
+          </button>
         </form>
       </div>
     </div>
 
     <div class="cadastro-form">
       <h1>Exata - Nomes</h1>
-      <img src="/public/Imagens/E__3_-removebg-preview (1).png" alt="Logo da Empresa" />
+      <img src="/Imagens/E__3_-removebg-preview (1).png" alt="Logo da Empresa" />
       <h3>Não possui acesso ainda?</h3>
       <button>Enviar E-mail</button>
     </div>
@@ -115,8 +169,20 @@ function recuperarSenha() {
   border-radius: 5px;
 }
 
+/* Error message styling */
+.error-message {
+  background-color: #ffebee;
+  color: #c62828;
+  padding: 12px;
+  border-radius: 4px;
+  margin-bottom: 20px;
+  border-left: 4px solid #c62828;
+  font-size: 14px;
+  text-align: center;
+}
+
 /* Estilo para o parágrafo "Esqueci minha senha" */
-.login-form p {
+.forgot-password {
   margin-top: -25px;
   margin-left: 140px;
   margin-bottom: 70px;
@@ -125,7 +191,7 @@ function recuperarSenha() {
   border-bottom: 1px solid transparent;
   transition: border-bottom-color 0.2s ease-out;
 }
-.login-form p:hover {
+.forgot-password:hover {
   border-bottom: 1px solid #132c0d; /* Adiciona um efeito de sublinhado ao passar o mouse */
 }
 
@@ -135,7 +201,8 @@ function recuperarSenha() {
   transition:
     background-color 0.4s ease,
     transform 0.4s ease,
-    width 0.4s ease;
+    width 0.4s ease,
+    opacity 0.3s ease;
   background-color: #132c0d67;
   color: white;
   border: none;
@@ -144,13 +211,19 @@ function recuperarSenha() {
   font-size: 1.1em;
 }
 
+.buttonentre:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 .buttonentre.ativo {
   background-color: #4caf50; /* Cor verde de sucesso */
   cursor: pointer; /* Muda o cursor para a "mãozinha" */
 }
 
 /* 3. A MÁGICA: O efeito de HOVER que só se aplica quando o botão tem a classe .ativo */
-.buttonentre.ativo:hover {
+.buttonentre.ativo:hover:not(:disabled) {
   background-color: #45a049; /* Um verde um pouco mais escuro no hover */
   transform: translateY(-4px);
   width: 290px;
