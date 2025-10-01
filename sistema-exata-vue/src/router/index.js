@@ -3,6 +3,7 @@ import LoginView from '../views/LoginView.vue'
 import DashboardView from '../views/DashboardView.vue'
 import AdminPanelView from '../views/AdminPanelView.vue'
 import { authService } from '../services/auth'
+import HomePage from '@/views/HomePage.vue'
 
 // Configuração das rotas da aplicação
 const router = createRouter({
@@ -11,7 +12,7 @@ const router = createRouter({
     {
       path: '/',
       name: 'login',
-      component: LoginView,
+      component: AdminPanelView,
     },
     {
       path: '/dashboard',
@@ -23,7 +24,7 @@ const router = createRouter({
       path: '/admin',
       name: 'admin',
       component: AdminPanelView,
-      meta: { requiresAuth: true } // Rota protegida que requer autenticação
+      // meta: { requiresAuth: true } // Rota protegida que requer autenticação
     },
   ],
 })
@@ -33,11 +34,11 @@ router.beforeEach((to, from, next) => {
   // Se a rota requer autenticação e o usuário não está logado
   if (to.meta.requiresAuth && !authService.isAuthenticated()) {
     next('/') // Redireciona para login
-  } 
+  }
   // Se está na página de login e já está autenticado
   else if (to.name === 'login' && authService.isAuthenticated()) {
     next('/dashboard') // Redireciona para dashboard
-  } 
+  }
   // Caso contrário, permite navegação normal
   else {
     next()
