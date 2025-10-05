@@ -3,8 +3,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { authService } from '../services/auth'
 import api, { userApi } from '../services/api'
-import IconUser from '@/components/icons/IconUser.vue' // Exemplo de caminho
-import IconSeta from '@/components/icons/IconSeta.vue'
+import HeaderNoHR from './Header_no_HR.vue'
 
 const router = useRouter()
 
@@ -361,45 +360,8 @@ const logout = () => {
 
 <template>
   <div class="admin-panel">
-    <header class="admin-header">
-      <!-- <div class="header-left">
-        <div class="logo-section">
-          <img src="/Imagens/E__3_-removebg-preview (1).png" alt="Logo Exata" class="header-logo" />
-        </div>
-      </div>
-      <div class="user-section">
-        <div class="user-info-header">
-          <span class="user-name">{{ userName }}</span>
-          <span class="user-type">{{ userType }}</span>
-        </div>
-        <button @click="goBack" class="back-btn">Voltar</button>
-        <button @click="logout" class="logout-btn">Sair</button>
-      </div> -->
 
-      <div class="home_green">
-        <div class="dados_principais">
-          <img src="/Imagens/IconeExata.png" alt="Icone Exatas" />
-          <div class="dados_usuarios">
-            <IconUser class="icone-perfil" />
-
-            <div class="info-texto">
-              <h1>Guilherme Pereira(Teste){{ userName }}</h1>
-              <h2>Administrador(Teste){{ userType }}</h2>
-            </div>
-
-            <IconSeta
-              class="icone-seta"
-              :class="{ 'virado-para-baixo': menuAberto }"
-              @click="menuAberto = !menuAberto"
-            />
-            <div v-if="menuAberto" class="div_info_inv">
-              <h1>Meu Perfil</h1>
-              <h1>Logout</h1>
-            </div>
-          </div>
-        </div>
-      </div>
-    </header>
+  <HeaderNoHR />
 
     <main class="admin-content">
       <div class="admin-card">
@@ -606,183 +568,6 @@ const logout = () => {
 </template>
 
 <style scoped>
-.admin-panel {
-  min-height: 100vh;
-  background-color: #f5f5f5;
-}
-
-/* .admin-header {
-  background-color: #132c0d;
-  color: white;
-  padding: 1rem 2rem;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.header-left {
-  display: flex;
-  align-items: center;
-}
-
-.logo-section {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-}
-
-.header-logo {
-  height: 50px;
-  width: auto;
-  max-width: 120px;
-  object-fit: contain;
-  filter: brightness(0) invert(1);
-  transition: opacity 0.3s ease;
-}
-
-.user-section {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.user-info-header {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  text-align: right;
-}
-
-.user-name {
-  font-size: 1rem;
-  font-weight: 600;
-  color: white;
-  margin-bottom: 0.25rem;
-}
-
-.user-type {
-  font-size: 0.875rem;
-  color: #e0e0e0;
-  background-color: rgba(255, 255, 255, 0.1);
-  padding: 0.25rem 0.5rem;
-  border-radius: 12px;
-  text-transform: uppercase;
-  font-weight: 500;
-}
-
-.back-btn, .logout-btn {
-  padding: 0.5rem 1rem;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: background-color 0.3s ease;
-  font-size: 0.875rem;
-}
-
-.back-btn {
-  background-color: #6c757d;
-  color: white;
-}
-
-.back-btn:hover {
-  background-color: #5a6268;
-}
-
-.logout-btn {
-  background-color: #4caf50;
-  color: white;
-}
-
-.logout-btn:hover {
-  background-color: #45a049;
-} */
-
-.home_green {
-  background-color: rgba(19, 44, 13, 1);
-  width: 100%;
-  height: 13vh;
-}
-
-.dados_principais {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0 1.5%;
-}
-
-.icone-perfil {
-  width: 40px; /* Ajuste o tamanho do ícone de perfil */
-  height: 40px;
-  color: white;
-  margin-right: 10px;
-  border: 4px solid white;
-  border-radius: 50%;
-}
-
-.icone-seta {
-  width: 30px; /* Ajuste o tamanho da seta */
-  height: 20px;
-  cursor: pointer;
-  margin-top: 13%;
-  margin-left: -25px;
-  transition: transform 0.3s ease;
-}
-
-.icone-seta.virado-para-baixo {
-  transform: rotate(180deg);
-}
-
-.dados_usuarios {
-  position: relative;
-  display: flex;
-  align-items: center;
-  color: white;
-  font-size: 12px;
-}
-
-.dados_usuarios h1 {
-  font-size: 20px;
-  padding-bottom: 5px;
-}
-
-.dados_usuarios h2 {
-  font-size: 15px;
-  font-weight: lighter;
-  width: 80%;
-}
-
-img {
-  width: 250px;
-}
-
-.div_info_inv {
- background-color: white;
-  position: absolute;   /* Posiciona em relação ao pai (.dados_usuarios) */
-  top: 100%;            /* Começa exatamente onde o pai termina (embaixo) */
-  right: 0;             /* Alinha à direita do pai */
-  margin-top: 8px;      /* Cria um pequeno espaço entre o header e o menu */
-  
-  width: 250px;         /* Defina uma largura fixa para o menu */
-  color: #333;          /* Cor escura para o texto */
-  font-size: 16px;
-  text-align: center;
-  padding: 10px;
-    border-radius: 0px 0px 20px 20px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15); /* Sombra suave */
-  z-index: 10; 
-}
-
-.div_info_inv h1 {
-  padding: 4px;
-  font-weight: lighter;
-  transition: all 0.3s ease;
-}
-
-.div_info_inv h1:hover {
-  background-color: rgba(19, 44, 13, 0.1);
-  cursor: pointer;
-}
 
 .admin-content {
   padding: 2rem;
@@ -1071,9 +856,11 @@ img {
   border-radius: 20px;
   width: 100%;
   max-width: 1000px;
-  height: 62vh;
+  height: auto;
+  max-height: 90vh;
   overflow-y: auto;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  
 }
 
 .modal-header {
@@ -1094,6 +881,28 @@ img {
   width: 92%;
   margin: auto;
 
+}
+
+.modal-content::-webkit-scrollbar {
+  width: 14px; 
+
+}
+
+.modal-content::-webkit-scrollbar-track {
+  background: transparent; 
+  
+  border-right: 4px solid white; 
+  background-clip: content-box;
+}
+
+.modal-content::-webkit-scrollbar-thumb {
+  background-color: #cccccc; 
+  border-radius: 10px; /* Deixa a barra arredondada */
+  border: 4px solid white; 
+}
+
+.modal-content::-webkit-scrollbar-thumb:hover {
+  background-color: #a8a8a8; /* Cor ao passar o mouse */
 }
 
 .close-btn {
@@ -1245,55 +1054,100 @@ img {
 
 
 
+/* Responsividade adicional para o Modal */
 
-/* Responsividade */
-@media (max-width: 768px) {
-  .admin-header {
-    flex-direction: column;
+/* Telas Médias (tablets) - a partir de 1024px para baixo */
+@media (max-width: 1024px) {
+  .modal-content {
+    max-width: 90%; /* Aumenta a largura em telas médias */
+    height: auto; /* Altura se ajusta ao conteúdo */
+    max-height: 90vh; /* Limita a altura máxima */
+  }
+
+  .user-form {
+    /* Mantém as duas colunas, mas com menos espaçamento */
     gap: 1rem;
     padding: 1rem;
   }
 
-  .user-section {
-    flex-direction: column;
-    gap: 0.5rem;
-    width: 100%;
+  .form-group label {
+    font-size: 16px; /* Reduz um pouco o tamanho da fonte */
+    margin-left: 15px;
   }
 
-  .back-btn,
-  .logout-btn {
-    width: 100%;
-    max-width: 200px;
-  }
-
-  .admin-content {
-    padding: 1rem;
-  }
-
-  .admin-card {
-    padding: 1.5rem;
-  }
-
-  .admin-buttons {
-    grid-template-columns: 1fr;
-  }
-
-  .users-table {
-    font-size: 0.875rem;
-  }
-
-  .users-table th,
-  .users-table td {
-    padding: 0.75rem 0.5rem;
+  .form-group input,
+  .form-group select {
+    margin-left: 15px;
+    padding: 0.6rem;
   }
 
   .form-actions {
-    flex-direction: column;
+    gap: 1rem;
   }
 
-  .cancel-btn,
-  .submit-btn {
-    width: 100%;
+  .submit-btn, .cancel-btn {
+    padding: 12px;
+    font-size: 18px;
+  }
+}
+
+
+/* Telas Pequenas (celulares) - a partir de 768px para baixo */
+@media (max-width: 768px) {
+  .modal-content {
+    /* Ocupa quase toda a tela, com uma pequena margem */
+    width: 95%;
+    max-width: 500px; /* Evita que fique muito largo em celulares maiores */
+    height: auto;
+    max-height: 85vh; /* Garante espaço para a interface do navegador */
+    padding: 0.5rem;
+  }
+  
+  .modal-header {
+    padding: 1rem;
+  }
+
+  .modal-header h3 {
+    font-size: 20px;
+    margin-left: 10px;
+  }
+
+  .user-form {
+    /* Muda para uma única coluna */
+    grid-template-columns: 1fr;
+    gap: 1rem; /* Espaçamento entre os campos */
+    padding: 1rem;
+  }
+
+  .form-group label {
+    margin-top: 10px; /* Reduz o espaçamento superior */
+    margin-left: 0;
+  }
+
+  .form-group input,
+  .form-group select {
+    width: 100%; /* Ocupa a largura total */
+    margin-left: 0;
+  }
+  
+  /* Faz com que as mensagens e os botões continuem ocupando a largura total */
+  .error-message,
+  .success-message,
+  .form-actions {
+    grid-column: 1 / -1; /* Garante que ocupe toda a grade de 1 coluna */
+  }
+
+  .form-actions {
+    flex-direction: column; /* Botões um em cima do outro */
+    gap: 0.75rem; /* Espaçamento entre os botões */
+    margin-top: 1rem;
+  }
+
+  .submit-btn,
+  .cancel-btn {
+    width: 100%; /* Botões ocupam a largura toda */
+    font-size: 16px;
+    padding: 14px;
   }
 }
 </style>

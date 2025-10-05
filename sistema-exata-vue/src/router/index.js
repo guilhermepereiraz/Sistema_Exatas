@@ -4,6 +4,9 @@ import DashboardView from '../views/DashboardView.vue'
 import AdminPanelView from '../views/AdminPanelView.vue'
 import { authService } from '../services/auth'
 import HomePage from '@/views/HomePage.vue'
+import UserInfoPainel from '@/views/UserInfoPainel.vue'
+import Header_Principal from '@/views/Header_Principal.vue'
+import Header_Logout from '@/views/Header_Logout.vue'
 
 // Configuração das rotas da aplicação
 const router = createRouter({
@@ -12,8 +15,21 @@ const router = createRouter({
     {
       path: '/',
       name: 'login',
-      component: AdminPanelView,
+      component: UserInfoPainel,
     },
+
+    {
+      path: '/home',
+      name: 'home',
+      component: HomePage,
+    },
+
+    {
+      path: '/perfil',
+      name: 'perfil',
+      component: UserInfoPainel,
+    },
+
     {
       path: '/dashboard',
       name: 'dashboard',
@@ -24,7 +40,7 @@ const router = createRouter({
       path: '/admin',
       name: 'admin',
       component: AdminPanelView,
-      // meta: { requiresAuth: true } // Rota protegida que requer autenticação
+      meta: { requiresAuth: true } // Rota protegida que requer autenticação
     },
   ],
 })
