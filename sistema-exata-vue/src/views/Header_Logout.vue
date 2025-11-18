@@ -9,12 +9,16 @@ function fazerLogout() {
   localStorage.removeItem('user_data')
   router.push({ name: 'login' })
 }
+
+function IrParaInicio() {
+  router.push({name: 'home'})
+}
 </script>
 
 <template>
   <div class="home_green">
     <div class="dados_principais">
-      <img src="/Imagens/IconeExata.png" alt="Icone Exatas" />
+      <img src="/Imagens/IconeExata.png" alt="Icone Exatas" v-on:click="IrParaInicio"/>
       <div class="dados_usuarios">
         <IconLogout class="icone-logout" @click="fazerLogout" title="Sair do Sistema" />
       </div>
@@ -38,6 +42,10 @@ function fazerLogout() {
 .dados_principais img {
   width: 180px;
   transition: width 0.3s ease;
+}
+
+img:hover {
+cursor: pointer;
 }
 
 .dados_usuarios {

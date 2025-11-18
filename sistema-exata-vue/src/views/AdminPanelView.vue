@@ -34,7 +34,9 @@ const isLoadingUsers = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
 
-const menuAberto = ref(false)
+const isDeleteUser = ref(false)
+const userToDelete = ref(null)
+
 
 
 // Carrega dados do usuário quando o componente é montado
@@ -178,20 +180,30 @@ function editUser(user) {
   showUserForm.value = true
 }
 
-// Função para excluir usuário
-async function deleteUser(user) {
-  if (!confirm(`Tem certeza que deseja excluir o usuário ${user.name}?`)) {
-    return
-  }
+function promptDeleteUser(user) {
+  userToDelete.value = user
+  isDeleteUser.value = true
+}
 
+function closeDeleteModalUser() {
+  isDeleteUser.value = false
+  userToDelete.value = null
+}
+
+
+// Função para excluir usuário
+async function confirmDeleteUser() {
+  if (!userToDelete.value) return 
   try {
-    await userApi.deleteUser(user.id)
+    
+    await userApi.deleteUser(userToDelete.value.id) // Usa o ID salvo
     successMessage.value = 'Usuário excluído com sucesso!'
+    closeDeleteModalUser() 
     await loadUsers()
   } catch (error) {
     console.error('Erro ao excluir usuário:', error)
     errorMessage.value = 'Erro ao excluir usuário. Tente novamente.'
-  }
+  } 
 }
 
 // Função para fechar modal
@@ -363,6 +375,29 @@ const logout = () => {
 
   <HeaderNoHR />
 
+<div class="confirmation-backdrop" v-if="isDeleteUser">
+  <div class="confirmation-window">
+    
+    <div class="confirmation-heading">
+      <h1>Tem certeza que deseja<br>excluir o usuário?</h1>
+    </div>
+
+    <div>
+       <span class="target-user-display">({{ userToDelete ? userToDelete.name : 'usuário'}})</span>
+    </div>
+
+    <div class="confirmation-text">
+      <p>O usuário <strong>SERÁ</strong> excluído do banco de dados.</p>
+    </div>
+
+    <div class="confirmation-actions">
+      <button class="action-button action-cancel" @click="closeDeleteModalUser">Não</button>
+      <button class="action-button action-confirm" @click="confirmDeleteUser">Sim</button>
+    </div>
+
+  </div>
+</div>
+
     <main class="admin-content">
       <div class="admin-card">
         <h2>Painel do Administrador</h2>
@@ -427,7 +462,7 @@ const logout = () => {
                     <button @click="editUser(user)" class="action-btn edit-btn" title="Editar">
                       ✏️
                     </button>
-                    <button @click="deleteUser(user)" class="action-btn delete-btn" title="Excluir">
+                    <button @click="promptDeleteUser(user)" class="action-btn delete-btn" title="Excluir">
                       🗑️
                     </button>
                   </td>
@@ -463,7 +498,7 @@ const logout = () => {
     <div v-if="showUserForm" class="modal-overlay" @click="closeUserForm">
       <div class="modal-content" @click.stop>
         <div class="modal-header">
-          <h3>{{ editingUser ? 'Editar Usuário' : 'Informações do Novo Usuário' }}</h3>
+          <h3>{{ editingUser ? 'Informações do Usuário' : 'Informações do Novo Usuário' }}</h3>
           <button @click="closeUserForm" class="close-btn">&times;</button>
     
         </div>
@@ -512,7 +547,7 @@ const logout = () => {
               :disabled="isLoading"
             />
           </div> -->
-                    <div class="form-group">
+              <div class="form-group">
             <label for="nivel_acesso">Nível de Acesso:</label>
             <select
               id="nivel_acesso"
@@ -539,7 +574,6 @@ const logout = () => {
               placeholder="Código da divisão (se aplicável)"
             />
           </div>
-
 
 
           <!-- Mensagem de erro -->
@@ -571,7 +605,7 @@ const logout = () => {
 
 .admin-content {
   padding: 2rem;
-  max-width: 1200px;
+  max-width: 1900px;
   margin: 0 auto;
 }
 
@@ -615,6 +649,7 @@ const logout = () => {
   gap: 0.5rem;
   justify-content: center;
   min-height: 60px;
+
 }
 
 .admin-btn:hover {
@@ -670,6 +705,8 @@ const logout = () => {
 
 .table-container {
   overflow-x: auto;
+  overflow-y: auto;  /* <-- ADICIONADO: Permite o scroll vertical */
+  max-height: 48vh;
   border-radius: 8px;
   border: 1px solid #e0e0e0;
 }
@@ -1053,6 +1090,114 @@ const logout = () => {
 }
 
 
+.confirmation-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.confirmation-window {
+  background-color: white;
+  padding: 2.5rem;
+  border-radius: 20px;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+  width: 90%;
+  max-width: 700px;
+  height: 90%;
+  max-height: 500px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 1.5rem;
+}
+
+.confirmation-heading h1 {
+  font-size: 2.2rem;
+  font-weight: 700;
+  color: #222;
+  margin: 0;
+  line-height: 1.3;
+  margin-top: 20%;
+}
+
+.target-user-display {
+  display: inline-block;
+  background-color: #eeeeee;
+  color: #555;
+  padding: 0.25rem 0.75rem;
+  border-radius: 16px;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.confirmation-text p {
+  font-size: 1.1rem;
+  color: #444;
+  margin: 0;
+}
+
+.confirmation-text strong {
+  color: #000;
+  font-weight: 700;
+}
+
+.confirmation-actions {
+  display: flex;
+  gap: 1rem;
+  width: 100%;
+  margin-top: 0.5rem;
+}
+
+.action-button {
+  flex-grow: 1;
+  padding: 0.8rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  border: 2px solid;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-top: 10%;
+}
+
+.action-cancel {
+  background-color: rgba(19, 44, 13, 0.8);
+  color: white;
+  font-size: 20px;
+  border: 1px solid black;
+  border-radius: 10px;
+  background-color: rgba(19, 44, 13, 0.8);
+}
+
+.action-cancel:hover {
+  background-color: #2e6931;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(19, 44, 13, 0.8);
+}
+
+.action-confirm {
+  background-color: #B83A3A;
+  border: 1px solid black;
+  border-radius: 10px;
+  background-color: rgba(139, 14, 14, 0.8);
+  color: white;
+}
+
+.action-confirm:hover {
+  background-color: rgba(209, 44, 44, 0.8);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(139, 14, 14, 0.8);
+}
+
 
 /* Responsividade adicional para o Modal */
 
@@ -1088,6 +1233,18 @@ const logout = () => {
   .submit-btn, .cancel-btn {
     padding: 12px;
     font-size: 18px;
+  }
+
+  .confirmation-window {
+    max-width: 85%; /* Aumenta um pouco a largura */
+    height: auto; /* Altura automática para não sobrar espaço */
+    max-height: 80vh; /* Limite para não estourar a tela */
+    padding: 2rem;
+  }
+
+  .confirmation-heading h1 {
+    font-size: 1.8rem; /* Reduz um pouco o título */
+    margin-top: 10%;
   }
 }
 
@@ -1148,6 +1305,30 @@ const logout = () => {
     width: 100%; /* Botões ocupam a largura toda */
     font-size: 16px;
     padding: 14px;
+  }
+
+  .confirmation-window {
+    width: 95%; /* Ocupa quase toda a largura */
+    max-width: none; 
+    height: auto;
+    max-height: 90vh;
+    padding: 1.5rem; /* Menos padding interno para sobrar espaço pro conteúdo */
+  }
+
+  .confirmation-heading h1 {
+    font-size: 1.5rem; /* Título menor para não quebrar linha demais */
+    margin-top: 5%;
+  }
+
+  .confirmation-actions {
+    flex-direction: column; /* Botões um em cima do outro */
+    gap: 0.8rem;
+  }
+
+  .action-button {
+    width: 100%; /* Botões ocupam a largura total */
+    margin-top: 0.5rem; /* Menos margem superior */
+    padding: 12px; /* Ajuste de área de toque */
   }
 }
 </style>

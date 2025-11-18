@@ -35,7 +35,7 @@ api.interceptors.response.use(
       // Token expirado ou inválido - limpa dados e redireciona para login
       localStorage.removeItem('auth_token')
       localStorage.removeItem('user_data')
-      window.location.href = '/'
+      // window.location.href = '/'
     }
     return Promise.reject(error)
   }

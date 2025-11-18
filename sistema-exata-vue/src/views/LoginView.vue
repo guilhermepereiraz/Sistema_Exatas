@@ -25,25 +25,24 @@ const validateForm = () => {
 async function fazerLogin() {
   // Verifica se o formulário está válido antes de prosseguir
   if (!isFormValid.value) return
-  
+
   // Ativa estado de carregamento e limpa mensagens de erro
   isLoading.value = true
   errorMessage.value = ''
-  
+
   try {
     // Prepara credenciais para envio
     const credentials = {
       email: email.value.trim(),
-      password: password.value
+      password: password.value,
     }
-    
+
     console.log('Tentando fazer login com:', credentials)
     const response = await authService.login(credentials)
     console.log('Resposta do login:', response)
-    
+
     // Redireciona para o dashboard após login bem-sucedido
-    router.push('/dashboard')
-    
+    router.push('/home')
   } catch (error) {
     console.error('Erro no login:', error)
     // Exibe mensagem de erro para o usuário
@@ -65,8 +64,6 @@ function recuperarSenha() {
   <div class="container">
     <div class="login-form">
       <h1>Acesse sua Conta</h1>
-
-      <div></div>
 
       <div class="input-container">
         <form @submit.prevent="fazerLogin">
@@ -106,10 +103,11 @@ function recuperarSenha() {
           </div>
 
           <p @click="recuperarSenha" class="forgot-password">Esqueci minha senha</p>
-          <button 
-            type="submit" 
-            class="buttonentre" 
-            :class="{ 'ativo': isFormValid && !isLoading }"
+          <button
+            type="button"
+            @click="fazerLogin"
+            class="buttonentre"
+            :class="{ ativo: isFormValid && !isLoading }"
             :disabled="!isFormValid || isLoading"
           >
             <span v-if="isLoading">Entrando...</span>
@@ -120,7 +118,6 @@ function recuperarSenha() {
     </div>
 
     <div class="cadastro-form">
-      <h1>Exata - Nomes</h1>
       <img src="/Imagens/E__3_-removebg-preview (1).png" alt="Logo da Empresa" />
       <h3>Não possui acesso ainda?</h3>
       <button>Enviar E-mail</button>
@@ -129,47 +126,44 @@ function recuperarSenha() {
 </template>
 
 <style scoped>
-/* Estilo do container principal que segura as duas colunas */
+/* --- ESTILOS GERAIS E DESKTOP (BASE) --- */
+
+/* Container principal que segura as duas colunas */
 .container {
   display: flex;
-  width: 100vw; /* vw = 100% da LARGURA da tela */
-  height: 100vh; /* vh = 100% da ALTURA da tela */
+  width: 100vw;
+  height: 100vh;
+  background-color: #fff; /* Fundo branco para a parte do formulário */
 }
 
-/* --- AQUI ESTÁ A CORREÇÃO PRINCIPAL --- */
+/* --- Coluna da Esquerda (Login) --- */
 .login-form {
-  width: 30%;
-  display: flex; /* Ativa o modo flexbox */
-  flex-direction: column; /* Empilha os itens um em cima do outro */
-  align-items: center; /* Centraliza tudo horizontalmente (no meio) */
-  justify-content: center; /* Centraliza tudo verticalmente (opcional, mas bom) */
+  width: 40%; /* Aumentei um pouco, 30% era muito apertado */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px; /* Adiciona respiro interno */
+  box-sizing: border-box; /* Garante que o padding não aumente a largura */
 }
 
 .login-form h1 {
-  padding: 0; /* Remove padding antigo para um melhor alinhamento */
-  margin-bottom: 50px; /* Adiciona espaço abaixo do título */
-  text-align: center;
+  margin-bottom: 40px;
   font-size: 2em;
-  font-weight: 200;
-  color: rgba(0, 0, 0, 0.712);
+  font-weight: 300; /* Um pouco mais leve */
+  color: #333;
 }
 
-/* Estiliza o formulário para organizar os inputs e botão */
+/* O formulário em si */
 .login-form form {
   display: flex;
-  flex-direction: column; /* Organiza os inputs um embaixo do outro */
-  align-items: center; /* Garante que eles também fiquem centralizados */
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 350px; /* <<< ESSA É A CHAVE! Limitamos o formulário */
 }
 
-.input_class {
-  padding: 15px;
-  width: 300px; /* Use uma unidade fixa como 'px' ou '%' para melhor controle */
-  margin-bottom: 15px; /* Espaçamento entre os campos */
-  border: 1px solid #ccc;
-  border-radius: 5px;
-}
-
-/* Error message styling */
+/* Mensagem de erro */
 .error-message {
   background-color: #ffebee;
   color: #c62828;
@@ -178,10 +172,53 @@ function recuperarSenha() {
   margin-bottom: 20px;
   border-left: 4px solid #c62828;
   font-size: 14px;
-  text-align: center;
+  width: 100%; /* Ocupa 100% do form */
+  box-sizing: border-box;
 }
 
-/* Estilo para o parágrafo "Esqueci minha senha" */
+/* Container do campo flutuante */
+.campo-flutuante {
+  position: relative;
+  width: 100%; /* Ocupa 100% do form */
+  margin-bottom: 25px;
+}
+
+/* Inputs (E-mail e Senha) */
+.input_class {
+  padding: 15px;
+  width: 100%; /* <<< ALTERADO! Ocupa 100% do .campo-flutuante */
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  box-sizing: border-box; /* Importante */
+}
+
+.label-flutuante {
+  position: absolute;
+  pointer-events: none;
+  left: 15px;
+  top: 15px;
+  transition: all 0.2s ease;
+  color: #888;
+  background-color: white;
+  padding: 0 5px;
+}
+
+.input_class::placeholder {
+  color: transparent;
+}
+
+.input_class:focus + .label-flutuante,
+.input_class:not(:placeholder-shown) + .label-flutuante {
+  top: -8px;
+  font-size: 12px;
+  color: #555;
+}
+
+.input_class:focus {
+  outline: none;
+  border-color: #132c0dbe;
+}
+
 .forgot-password {
   margin-top: -25px;
   margin-left: 140px;
@@ -195,13 +232,12 @@ function recuperarSenha() {
   border-bottom: 1px solid #132c0d; /* Adiciona um efeito de sublinhado ao passar o mouse */
 }
 
+/* Botão de Entrar */
 .buttonentre {
-  width: 300px; /* Mesma largura dos inputs para um visual consistente */
+  width: 100%; /* <<< ALTERADO! Ocupa 100% do form */
   padding: 15px;
   transition:
     background-color 0.4s ease,
-    transform 0.4s ease,
-    width 0.4s ease,
     opacity 0.3s ease;
   background-color: #132c0d67;
   color: white;
@@ -209,6 +245,7 @@ function recuperarSenha() {
   border-radius: 5px;
   cursor: pointer;
   font-size: 1.1em;
+  transition: all 0.3s ease;
 }
 
 .buttonentre:disabled {
@@ -218,186 +255,110 @@ function recuperarSenha() {
 }
 
 .buttonentre.ativo {
-  background-color: #4caf50; /* Cor verde de sucesso */
-  cursor: pointer; /* Muda o cursor para a "mãozinha" */
+  background-color: #132c0d; /* Cor verde mais forte */
 }
 
-/* 3. A MÁGICA: O efeito de HOVER que só se aplica quando o botão tem a classe .ativo */
 .buttonentre.ativo:hover:not(:disabled) {
-  background-color: #45a049; /* Um verde um pouco mais escuro no hover */
-  transform: translateY(-4px);
-  width: 290px;
+  background-color: #1a3a11; /* Verde um pouco mais escuro */
+  transform: translateY(-2px); /* Efeito de subir sutil */
 }
 
-.campo-flutuante {
-  position: relative; /* Essencial para o posicionamento do label */
-  margin-bottom: 25px; /* Espaço entre os campos */
-}
-
-/* O estilo para o label que vai flutuar */
-.label-flutuante {
-  position: absolute;
-  pointer-events: none; /* Permite clicar através do label no input */
-  left: 15px;
-  top: 15px; /* Posição inicial, centralizado no campo */
-  transition: all 0.2s ease; /* Animação suave */
-  color: #888;
-  background-color: white; /* Fundo branco para criar o "corte" na borda */
-  padding: 0 5px; /* Espaço nas laterais do texto do label */
-}
-
-/* Remove o placeholder padrão do input */
-.input_class::placeholder {
-  color: transparent;
-}
-
-/* A MÁGICA: Quando o input está focado OU preenchido... */
-.input_class:focus + .label-flutuante,
-.input_class:not(:placeholder-shown) + .label-flutuante {
-  /* ... o label sobe e diminui! */
-  top: -8px; /* Move para cima da borda */
-  font-size: 12px;
-  color: #555;
-}
-
-/* Muda a cor da borda quando o input está focado */
-.input_class:focus {
-  outline: none; /* Remove o contorno padrão do navegador */
-  border-color: #132c0dbe; /* Uma cor que combina com seu botão */
-}
-
+/* --- Coluna da Direita (Logo/Marca) --- */
 .cadastro-form {
-  width: 70%; /* Coluna verde ocupará os 65% restantes */
-  height: 100%; /* Ocupa 100% da altura do container */
-  background-color: #132c0d; /* A cor verde que você queria */
-  /* As linhas abaixo centralizam o conteúdo da coluna verde */
+  width: 100%; /* Ocupa os 60% restantes */
+  height: 100%;
+  background-color: #132c0d;
   display: flex;
   flex-direction: column;
   align-items: center;
-  border-top-left-radius: 25px;
-  border-end-start-radius: 25px;
-  box-shadow: 2px 2px 3px 10px rgba(192, 192, 192, 0.658);
-}
-
-.cadastro-form h1 {
-  padding: 0; /* Remove padding antigo para um melhor alinhamento */
-  margin-top: 100px; /* Espaço acima do título */
-  text-align: center;
-  font-size: 4em;
-  font-weight: 200;
-  color: white;
+  justify-content: center; /* Centraliza verticalmente */
+  border-top-left-radius: 35px;
+  border-bottom-left-radius: 35px; /* Mudei para border-bottom */
+  box-shadow: 2px 2px 10px 10px rgba(134, 133, 133, 0.658);
+  padding: 40px;
+  box-sizing: border-box;
 }
 
 .cadastro-form img {
-  width: 500px; /* Ajuste o tamanho da imagem conforme necessário */
-  height: auto; /* Mantém a proporção da imagem */
-  margin-top: 15%; /* Espaço abaixo da imagem */
+  width: 100%;
+  max-width: 500px; /* Limite para a logo não ficar gigante */
+  height: auto;
+  margin-bottom: 20px; /* Espaço abaixo da logo */
+  margin-top: 200px;
 }
 
 .cadastro-form h3 {
   color: white;
   font-weight: 200;
-  margin-top: 15%;
   font-size: 1.5em;
+  margin-top: 100px;
 }
 
 .cadastro-form button {
-  font-weight: bolder;
-  margin-top: 2%;
-  padding: 10px;
-  width: 15%;
+  font-weight: bold;
+  margin-top: 20px;
+  padding: 12px 30px; /* Mais padding lateral */
+  width: auto; /* Largura automática */
   font-size: 1em;
   border-radius: 5px;
   border: none;
+  background-color: #fff;
+  color: #132c0d; /* Texto do botão verde */
+  cursor: pointer;
+  transition: all 0.3s ease;
 }
 
 .cadastro-form button:hover {
-  cursor: pointer;
+  background-color: #f0f0f0;
+  transform: translateY(-2px);
 }
 
-.cadastro-form button:active {
-  border: 2px solid #132c0d; /* Adiciona uma borda verde quando o botão é clicado */
-}
-
-/* Para Telas Médias (Tablets) - até 992px de largura */
-@media (max-width: 992px) {
-  .login-form {
-    width: 45%; /* Aumenta um pouco o espaço do formulário */
-  }
-  .cadastro-form {
-    width: 55%; /* Diminui um pouco o espaço da área verde */
-  }
-  .cadastro-form h1 {
-    font-size: 3em; /* Diminui um pouco o título */
-  }
-  .cadastro-form img {
-    width: 350px; /* Diminui a imagem */
-  }
-}
-
-/* Para Telas Pequenas (Celulares) - até 768px de largura */
-@media (max-width: 768px) {
-  /* Faz o layout de colunas virar uma pilha vertical */
+/*
+ * =======================================================
+ * A MÁGICA DA RESPONSIVIDADE (MOBILE)
+ * =======================================================
+ */
+@media (max-width: 800px) {
   .container {
-    flex-direction: column;
+    flex-direction: column; /* Empilha as colunas */
+    height: auto; /* Altura deixa de ser 100vh */
   }
 
-  /* As duas seções agora ocupam 100% da largura */
+  /* Na C-Soluções, as duas colunas ocupam 100% da largura */
   .login-form,
   .cadastro-form {
     width: 100%;
-    height: auto; /* A altura se ajusta ao conteúdo */
-    min-height: 50vh; /* Garante que ocupem pelo menos metade da tela cada */
-    padding: 40px 20px; /* Adiciona espaçamento interno */
-    box-sizing: border-box; /* Garante que o padding não estoure a largura */
+    height: auto; /* Altura automática */
   }
 
-  /* Remove a sombra da direita no modo celular */
+  .login-form {
+    height: auto;
+    min-height: 100vh; /* O form ocupa pelo menos a tela inteira */
+    padding: 40px 20px; /* Menos respiro nas laterais */
+  }
+
   .cadastro-form {
-    box-shadow: none;
-  }
-
-  /* Ajusta o título do formulário de login */
-  .login-form h1 {
-    font-size: 1.8em;
-    margin-bottom: 30px;
-  }
-
-  /* Faz os inputs e o botão ocuparem uma largura relativa, não fixa */
-  .input_class,
-  .buttonentre {
-    width: 90%;
-    max-width: 350px; /* Limita a largura máxima para não ficar gigante */
-  }
-
-  /* Centraliza o parágrafo "Esqueci minha senha" */
-  .login-form p {
-    margin-left: 0;
-    text-align: center;
-    width: 90%;
-    max-width: 350px;
-    margin-bottom: 40px;
-  }
-
-  /* Ajusta os textos e a imagem da seção verde */
-  .cadastro-form h1 {
-    font-size: 2.5em;
-    margin-top: 20px;
+    /* A coluna verde vira um "rodapé" ou seção separada */
+    padding: 50px 20px;
+    border-radius: 0; /* Remove cantos arredondados */
+    box-shadow: none; /* Remove sombra */
   }
 
   .cadastro-form img {
-    width: 200px;
-    margin-top: 10%;
+    max-width: 200px; /* Logo menor no mobile */
+    margin-bottom: 30px;
+    margin-top: 50px;
   }
 
   .cadastro-form h3 {
-    font-size: 1.5em;
-    margin-top: 15%;
+    font-size: 1.2em;
+    text-align: center;
+    margin-top: 20px;
   }
 
   .cadastro-form button {
-    width: 60%;
-    max-width: 250px;
+    width: 80%; /* Botão mais largo e "tocável" */
+    max-width: 300px;
   }
 }
 </style>

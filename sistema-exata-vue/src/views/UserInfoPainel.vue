@@ -1,18 +1,116 @@
 <script setup>
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted } from 'vue'
 import { authService } from '../services/auth'
-import IconLogout from '@/components/icons/IconLogout.vue' // Exemplo de caminho
+
 import HeaderLogout from './Header_Logout.vue'
+
+
+const userEmail = ref('')
+const userName = ref('')
+const userType = ref('')
+
+onMounted(() => {
+  const user = authService.getCurrentUser()
+  
+  // Se não há usuário logado, redireciona para login
+  if (!user) {
+    router.push('/')
+    return
+  }
+  
+  // Preenche dados do usuário para exibição
+  userEmail.value = user.email || 'N/A'
+  userName.value = user.name || 'Usuário'
+  userType.value = user.nivel_acesso || 'Usuário'
+})
+
+const isEditing = ref(false)
+const fileInput = ref(null)
+
+const isChangingPassword = ref(false)
+const oldPassword = ref('')
+const newPassword = ref('')
+
+const placeholderAvatar = '/Imagens/Carregar_foto_perfil.png'
+
+const userData = ref({
+  nome: 'Guilherme(Teste)',
+  criadoEm: '24 de Fevereiro de 2025',
+  divisao: 'Santana - Mirante',
+  email: 'Guilherme@exatas.com.br(Teste)',
+  avatar: '/Imagens/3d_avatar_21.png',
+})
+
+const originalUserData = ref(null)
+
+function editarPerfil() {
+  originalUserData.value = JSON.parse(JSON.stringify(userData.value))
+  userData.value.avatar = placeholderAvatar
+  isEditing.value = true
+}
+
+function salvarAlteracoes() {
+  if (userData.value.avatar === placeholderAvatar) {
+    userData.value.avatar = originalUserData.value.avatar
+  }
+  isEditing.value = false
+}
+
+function cancelarAlteracao() {
+  userData.value = originalUserData.value
+  isEditing.value = false
+}
+
+function triggerFileInput() {
+  fileInput.value.click()
+}
+
+function onFileChange(event) {
+  const file = event.target.files[0]
+  if (file) {
+    userData.value.avatar = URL.createObjectURL(file)
+  }
+}
+
+function showPasswordFields() {
+  isChangingPassword.value = true
+}
+
+function saveNewPassword() {
+  console.log('Senha Antiga:', oldPassword.value)
+  console.log('Senha Nova:', newPassword.value)
+  hidePasswordFields()
+}
+
+function hidePasswordFields() {
+  isChangingPassword.value = false
+  oldPassword.value = ''
+  newPassword.value = ''
+}
 </script>
 
 <template>
   <HeaderLogout />
 
   <div class="info-container">
+    <input
+      type="file"
+      ref="fileInput"
+      @change="onFileChange"
+      style="display: none"
+      accept="image/*"
+    />
+
     <div class="info-header">
       <h1 class="info_userh1">Informações do Usuário</h1>
-      <button class="info_button">Editar Informações</button>
+      <button v-if="!isEditing" class="info_button" @click="editarPerfil">
+        Editar Informações
+      </button>
+
+      <div v-if="isEditing" class="action-buttons">
+        <button class="btn-salvar" @click="salvarAlteracoes">Salvar</button>
+        <button class="btn-cancelar" @click="cancelarAlteracao">Cancelar</button>
+      </div>
     </div>
 
     <hr class="hr_cima" />
@@ -20,12 +118,13 @@ import HeaderLogout from './Header_Logout.vue'
     <div class="user-details">
       <div class="detail-item item-nome">
         <h1>Nome Completo:</h1>
-        <h2>Guilherme(Teste)</h2>
+        <h2 v-if="!isEditing">{{ userName }}</h2>
+        <input v-else type="text" v-model="userName" class="edit-input" />
       </div>
 
       <div class="detail-item item-criado">
         <h1>Usuário Criado em:</h1>
-        <h2>24 de Fevereiro de 2025</h2>
+        <h2>{{ userData.criadoEm }}</h2>
       </div>
 
       <div class="detail-item item-divisao">
@@ -34,17 +133,43 @@ import HeaderLogout from './Header_Logout.vue'
       </div>
 
       <div class="detail-item item-avatar">
-        <img src="/Imagens/3d_avatar_21.png" alt="Avatar do usuário" class="avatar" />
+        <img
+          :src="userData.avatar"
+          alt="Avatar do usuário"
+          class="avatar"
+          :class="{ 'editable-avatar': isEditing }"
+          @click="isEditing ? triggerFileInput() : null"
+        />
       </div>
 
       <div class="detail-item item-email">
         <h1>E-mail:</h1>
-        <h2>Guilherme@exatas.com.br(Teste)</h2>
+        <h2 v-if="!isEditing">{{ userEmail }}</h2>
+        <input v-else type="text" v-model="userEmail" class="edit-input" />
       </div>
 
       <div class="detail-item item-senha">
         <h1>Senha:</h1>
-        <button class="alt_bnt">Alterar Senha</button>
+
+        <button v-if="!isChangingPassword" @click="showPasswordFields" class="alt_bnt">
+          Alterar Senha
+        </button>
+
+        <div v-if="isChangingPassword" class="password-change-form">
+          <input
+            type="password"
+            v-model="oldPassword"
+            class="edit-password"
+            placeholder="Informe a senha antiga"
+          />
+          <input
+            type="password"
+            v-model="newPassword"
+            class="edit-password"
+            placeholder="Informe a nova senha"
+          />
+          <button class="bntsalvar" @click="saveNewPassword">Salvar</button>
+        </div>
       </div>
     </div>
   </div>
@@ -132,7 +257,7 @@ img {
     'divisao avatar'
     'email   avatar'
     'senha   avatar';
-  gap: 2.5rem 4rem;
+  gap: 2.5rem 30rem;
 }
 
 .item-nome {
@@ -223,6 +348,112 @@ img {
 }
 
 .alt_bnt:hover {
+  background-color: #0f2410;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(19, 44, 13, 0.3);
+}
+
+.action-buttons {
+  display: flex;
+  gap: 15px; /* Espaçamento entre os botões */
+}
+
+/* Estilo para o botão SALVAR */
+.btn-salvar {
+  border: 2px solid #353535;
+  padding: 10px 50px;
+  font-size: 18px;
+  font-weight: bolder;
+  color: white;
+  background-color: rgba(19, 44, 13, 0.8); /* Um verde para salvar */
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-salvar:hover {
+  background-color: #1e501e;
+  transform: translateY(-2px);
+}
+
+/* Estilo para o botão CANCELAR */
+.btn-cancelar {
+  border: 2px solid #353535;
+  padding: 10px 40px;
+  font-size: 18px;
+  font-weight: bolder;
+  color: white;
+  background-color: rgba(139, 14, 14, 0.8); /* Um cinza claro para cancelar */
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-cancelar:hover {
+  background-color: rgba(163, 8, 8, 0.8);
+  transform: translateY(-2px);
+}
+
+/* Classe para a imagem quando estiver editável */
+.editable-avatar {
+  cursor: pointer;
+  opacity: 0.8;
+  border: 2px dashed #333; /* Adiciona uma borda para indicar que é clicável */
+}
+
+.editable-avatar:hover {
+  opacity: 1;
+  border-color: #2a6e2a;
+}
+
+.edit-input {
+  width: 55%;
+  font-size: 15px;
+  padding: 12px 12px 12px 20px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background-color: #fff;
+  color: #333;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.edit-input:focus {
+  outline: none;
+  border-color: rgba(19, 44, 13, 0.8);
+  box-shadow: 0 0 5px rgba(19, 44, 13, 0.5);
+}
+
+.password-change-form {
+  display: flex;
+  flex-wrap: wrap; 
+  align-items: center;
+  gap: 5px; /* <-- ADICIONE ESTA LINHA */
+}
+
+.edit-password {
+  width: 40%;
+  font-size: 15px;
+  padding: 12px 12px 12px 20px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background-color: #fff;
+  color: #333;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+
+.bntsalvar {
+  padding: 8px 25px;
+  background-color: rgba(19, 44, 13, 0.8);
+  color: white;
+  border: 1px solid black;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-left: 10px;
+}
+
+.bntsalvar:hover {
   background-color: #0f2410;
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(19, 44, 13, 0.3);

@@ -4,7 +4,6 @@ import { useRouter } from 'vue-router'
 import { authService } from '../services/auth'
 import HeaderPrincipal from './Header_Principal.vue'
 
-
 const router = useRouter()
 
 function irParaAdmin() {
@@ -15,7 +14,7 @@ function irParaAdmin() {
 <template>
   <HeaderPrincipal />
   <div class="home">
-
+    <img src="/Imagens/Imagem_admin_painel.png" alt="" class="img_princ" />
   </div>
   <div class="home_white">
     <div class="buttons">
@@ -28,17 +27,15 @@ function irParaAdmin() {
 </template>
 
 <style scoped>
-
-.home {
-  background-color: rgba(19, 44, 13, 1);
-  width: 100%;
-  height: 60vh;
-}
 .buttons {
   display: flex;
   justify-content: space-around;
-  margin-top: 3%;
+  margin-top: 7%;
   margin-bottom: 3%;
+}
+
+.img_princ {
+  width: 100%;
 }
 
 .bnt_imob {
@@ -84,8 +81,6 @@ function irParaAdmin() {
   align-items: center;
   padding: 0 1.5%;
 }
-
-
 
 .hr_baixo {
   width: 96%;
@@ -145,5 +140,8 @@ img {
 .div_info_inv h1:hover {
   background-color: rgba(19, 44, 13, 0.1);
   cursor: pointer;
+}
+
+@media (max-width: 768px) {
 }
 </style>

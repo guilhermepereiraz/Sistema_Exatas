@@ -1,8 +1,9 @@
 <script setup>
-import { ref } from 'vue'
 import IconUser from '@/components/icons/IconUser.vue'
 import IconSeta from '@/components/icons/IconSeta.vue'
 import { useRouter } from 'vue-router'
+import { ref, onMounted } from 'vue'
+import { authService } from '../services/auth'
 
 const router = useRouter()
 const menuAberto = ref(false)
@@ -11,24 +12,53 @@ function irParaPerfil() {
     router.push ({ name: 'perfil'})
 }
 
+function IrParaInicio() {
+  router.push({name: 'home'})
+}
+
+const userEmail = ref('')
+const userName = ref('')
+const userType = ref('')
+
+// Carrega dados do usuário quando o componente é montado
+onMounted(() => {
+  const user = authService.getCurrentUser()
+  
+  // Se não há usuário logado, redireciona para login
+  if (!user) {
+    router.push('/')
+    return
+  }
+  
+  // Preenche dados do usuário para exibição
+  userEmail.value = user.email || 'N/A'
+  userName.value = user.name || 'Usuário'
+  userType.value = user.nivel_acesso || 'Usuário'
+})
+
+const logout = () => {
+  authService.logout()
+  router.push('/')
+}
+
 </script>
 
 <template>
   <div class="home_green">
     <div class="dados_principais">
-      <img src="/Imagens/IconeExata.png" alt="Icone Exatas" />
+      <img src="/Imagens/IconeExata.png" alt="Icone Exatas" v-on:click="IrParaInicio"/>
       <div class="dados_usuarios">
         <IconUser class="icone-perfil" />
 
         <div class="info-texto">
-          <h1>Guilherme Pereira(Teste)</h1>
-          <h2>Administrador(Teste)</h2>
+          <h1>{{ userName }}</h1>
+          <h2>{{ userEmail }}</h2>
         </div>
 
         <IconSeta class="icone-seta" :class="{ 'virado-para-baixo': menuAberto}" @click="menuAberto = !menuAberto"/>
         <div v-if="menuAberto" class="div_info_inv">
           <h1 @click="irParaPerfil">Meu Perfil</h1>
-          <h1>Logout</h1>
+          <h1 @click="logout()">Logout</h1>
         </div>
       </div>
     </div>
@@ -62,6 +92,10 @@ function irParaPerfil() {
   border: 3px solid white;
   border-radius: 50%;
   flex-shrink: 0; /* MUITO IMPORTANTE: Impede que o ícone seja espremido e fique oval */
+}
+
+img:hover {
+  cursor: pointer;
 }
 
 .icone-seta {
