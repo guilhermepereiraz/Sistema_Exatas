@@ -1,7 +1,8 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import LoginView from '../views/LoginView.vue'
-import DashboardView from '../views/DashboardView.vue'
+
 import AdminPanelView from '../views/AdminPanelView.vue'
+import ContratoView from '../views/ContratosView.vue'
 import { authService } from '../services/auth'
 import HomePage from '@/views/HomePage.vue'
 import UserInfoPainel from '@/views/UserInfoPainel.vue'
@@ -22,20 +23,25 @@ const router = createRouter({
       path: '/home',
       name: 'home',
       component: HomePage,
+      meta: { requiresAuth: true }
     },
 
     {
       path: '/perfil',
       name: 'perfil',
       component: UserInfoPainel,
+      meta: { requiresAuth: true }
     },
 
+
+
     {
-      path: '/dashboard',
-      name: 'dashboard',
-      component: DashboardView,
+      path: '/contrato',
+      name: 'contrato',
+      component: ContratoView,
       meta: { requiresAuth: true } // Rota protegida que requer autenticação
     },
+
     {
       path: '/admin',
       name: 'admin',

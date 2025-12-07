@@ -1,9 +1,261 @@
+
+<template>
+  <div class="admin-panel">
+
+  <HeaderNoHR />
+
+<div class="confirmation-backdrop" v-if="isDeleteUser">
+  <div class="confirmation-window">
+    
+    <div class="confirmation-heading">
+      <h1>Tem certeza que deseja<br>excluir o usuário?</h1>
+    </div>
+
+    <div>
+       <span class="target-user-display">({{ userToDelete ? userToDelete.name : 'usuário'}})</span>
+    </div>
+
+    <div class="confirmation-text">
+      <p>O usuário <strong>SERÁ</strong> excluído do banco de dados.</p>
+    </div>
+
+    <div class="confirmation-actions">
+      <button class="action-button action-cancel" @click="closeDeleteModalUser">Não</button>
+      <button class="action-button action-confirm" @click="confirmDeleteUser">Sim</button>
+    </div>
+
+  </div>
+</div>
+
+    <main class="admin-content">
+      <div class="admin-card">
+        <!-- <h2>Painel do Administrador</h2>
+        <p>Gerencie usuários e funcionalidades do sistema</p> -->
+
+        <!-- Botões de ação -->
+        <div class="admin-buttons">
+          <button @click="atualizarPEPS" class="admin-btn">
+            <span class="btn-icon"></span>
+            Atualizar PEPS
+          </button>
+          <button @click="atualizarContratos" class="admin-btn">
+            <span class="btn-icon"></span>
+            Atualizar Contratos
+          </button>
+          <button @click="atualizarMedicao" class="admin-btn">
+            <span class="btn-icon"></span>
+            Atualizar Medição
+          </button>
+            <button @click="atualizarDenominacao" class="admin-btn">
+            <span class="btn-icon"></span>
+            Arquivos Denominação
+          </button>
+          <button @click="showUserForm = true" class="admin-btn">
+            <span class="btn-icon"></span>
+            Novo Usuário
+          </button>
+        </div>
+
+        <!-- Tabela de usuários -->
+        <div class="users-section">
+          <!-- <div class="users-header">
+            <h3>Usuários Cadastrados</h3>
+            <button @click="loadUsers" class="reload-btn" :disabled="isLoadingUsers">
+              <span v-if="isLoadingUsers">🔄</span>
+              <span v-else>↻</span>
+              Recarregar
+            </button>
+          </div> -->
+          <div class="table-container">
+            <div v-if="isLoadingUsers" class="loading-users">
+              <div class="loading-spinner"></div>
+              <span>Carregando usuários...</span>
+            </div>
+            <table v-else class="users-table">
+              <thead>
+                <tr>
+                  <th>Nome Completo</th>
+                  <th>Email</th>
+                  <th>Nível de Acesso</th>
+                  <th>Divisão</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="user in users" :key="user.id">
+                  <td>{{ user.name }}</td>
+                  <td>{{ user.email }}</td>
+                  <td>
+                    <span class="access-level" :class="user.nivel_acesso">
+                      {{ getAccessLevelLabel(user.nivel_acesso) }}
+                    </span>
+                  </td>
+                  <td>{{ user.divisao_id || '-' }}</td>
+                  <td class="actions">
+                    <button @click="editUser(user)" class="action-btn edit-btn" title="Editar">
+                      ✏️
+                    </button>
+                    <button @click="promptDeleteUser(user)" class="action-btn delete-btn" title="Excluir">
+                      🗑️
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <div v-if="!isLoadingUsers && users.length === 0" class="no-users">
+              <div class="no-users-content">
+                <h4>Nenhum usuário cadastrado</h4>
+                <p>Verifique se:</p>
+                <ul>
+                  <li>O backend Laravel está rodando em <code>http://127.0.0.1:8000</code></li>
+                  <li>O endpoint <code>/api/v1/users</code> está funcionando</li>
+                  <li>Existem usuários cadastrados no banco de dados</li>
+                  <li>Você está autenticado (token válido)</li>
+                </ul>
+                <div class="test-buttons">
+                  <button @click="testApiConnection" class="test-api-btn">
+                    🔍 Testar Conexão com API
+                  </button>
+                  <button @click="testUserRegistration" class="test-api-btn">
+                    👤 Testar Cadastro de Usuário
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+      <PopupLoadView 
+      v-if="showDenominacaoPopup" 
+      title="Carregar Denominação"
+      @close="showDenominacaoPopup = false" 
+    />
+
+    <PopupLoadView v-if="showCadastroQauntPopup"
+    title="Carregar Quantitativo Cadastro" @close="showCadastroQauntPopup = false"/>
+
+    <PopupLoadView v-if="showContratosPopup"
+    title="Carregar Contratos" @close="showContratosPopup = false"/>
+
+    <PopupLoadView v-if="showCji3Popup" 
+    title="Carregar CJI3" @close="showCji3Popup = false"/>
+
+    <!-- Modal de formulário de usuário -->
+    <div v-if="showUserForm" class="modal-overlay" @click="closeUserForm">
+      <div class="modal-content" @click.stop>
+        <div class="modal-header">
+          <h3>{{ editingUser ? 'Informações do Usuário' : 'Informações do Novo Usuário' }}</h3>
+          <button @click="closeUserForm" class="close-btn">&times;</button>
+    
+        </div>
+        <hr class="modal-hr"></hr>
+
+        <form @submit.prevent="saveUser" class="user-form">
+          <div class="form-group">
+            <label for="name">Nome Completo:</label>
+            <input type="text" id="name" v-model="formData.name" required :disabled="isLoading" placeholder="Nome do Colaborador" />
+          </div>
+
+          <div class="form-group">
+            <label for="email">E-mail:</label>
+            <input
+              type="email"
+              id="email"
+              v-model="formData.email"
+              required
+              :disabled="isLoading"
+              placeholder="E-mail de acesso do colaborador"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="password">Senha:</label>
+            <input
+              type="password"
+              id="password"
+              v-model="formData.password"
+              :required="!editingUser"
+              :disabled="isLoading"
+              placeholder="Mínimo de 8 caracteres, com letras e números."
+            />
+            <small v-if="editingUser" class="form-help"
+              >Deixe em branco para manter a senha atual</small
+            >
+          </div>
+<!-- 
+          <div v-if="!editingUser" class="form-group">
+            <label for="password_confirmation">Confirmar Senha:</label>
+            <input
+              type="password"
+              id="password_confirmation"
+              v-model="formData.password_confirmation"
+              :required="!editingUser"
+              :disabled="isLoading"
+            />
+          </div> -->
+              <div class="form-group">
+            <label for="nivel_acesso">Nível de Acesso:</label>
+            <select
+              id="nivel_acesso"
+              v-model="formData.nivel_acesso"
+              required
+              :disabled="isLoading"
+              :class="{ 'placeholder-color': !formData.nivel_acesso }"
+            >
+              <option value="" disabled selected>Defina a permissão do usuário</option>
+              <option value="admin">Administrador</option>
+              <option value="exata">Exata</option>
+              <option value="sabesp">SABESP</option>
+              <option value="usuario">Usuário</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="divisao_id">Divisão ID (opcional):</label>
+            <input
+              type="number"
+              id="divisao_id"
+              v-model="formData.divisao_id"
+              :disabled="isLoading"
+              placeholder="Código da divisão (se aplicável)"
+            />
+          </div>
+
+
+          <!-- Mensagem de erro -->
+          <div v-if="errorMessage" class="error-message">
+            {{ errorMessage }}
+          </div>
+
+          <!-- Mensagem de sucesso -->
+          <div v-if="successMessage" class="success-message">
+            {{ successMessage }}
+          </div>
+
+          <div class="form-actions">
+                        <button type="submit" class="submit-btn" :disabled="isLoading">
+              <span v-if="isLoading">{{ editingUser ? 'Salvando...' : 'Cadastrando...' }}</span>
+              <span v-else>{{ editingUser ? 'Salvar' : 'Cadastrar' }}</span>
+            </button>
+            <button type="button" @click="closeUserForm" class="cancel-btn" :disabled="isLoading">
+              Cancelar
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</template>
+
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { authService } from '../services/auth'
 import api, { userApi } from '../services/api'
 import HeaderNoHR from './Header_no_HR.vue'
+import PopupLoadView  from './PopupLoadView.vue'
 
 const router = useRouter()
 
@@ -17,6 +269,11 @@ const users = ref([])
 // Estados do modal e formulário
 const showUserForm = ref(false)
 const editingUser = ref(null)
+
+const showDenominacaoPopup = ref(false);
+const showCadastroQauntPopup = ref(false);
+const showContratosPopup = ref(false);
+const showCji3Popup = ref(false);
 
 // Dados do formulário de cadastro
 const formData = ref({
@@ -98,16 +355,22 @@ async function loadUsers() {
 
 // Funções dos botões de ação
 function atualizarPEPS() {
-  alert('Funcionalidade de atualização de PEPS será implementada em breve')
+  showCji3Popup.value = true;
 }
 
 function atualizarContratos() {
-  alert('Funcionalidade de atualização de contratos será implementada em breve')
+  showContratosPopup.value = true;
 }
 
-function arquivosMedicao() {
-  alert('Funcionalidade de arquivos de medição será implementada em breve')
+function atualizarMedicao() {
+  showCadastroQauntPopup.value = true;
 }
+
+function atualizarDenominacao() {
+  showDenominacaoPopup.value = true;
+}
+
+
 
 // Função para salvar usuário (criar ou editar)
 async function saveUser() {
@@ -370,237 +633,6 @@ const logout = () => {
 }
 </script>
 
-<template>
-  <div class="admin-panel">
-
-  <HeaderNoHR />
-
-<div class="confirmation-backdrop" v-if="isDeleteUser">
-  <div class="confirmation-window">
-    
-    <div class="confirmation-heading">
-      <h1>Tem certeza que deseja<br>excluir o usuário?</h1>
-    </div>
-
-    <div>
-       <span class="target-user-display">({{ userToDelete ? userToDelete.name : 'usuário'}})</span>
-    </div>
-
-    <div class="confirmation-text">
-      <p>O usuário <strong>SERÁ</strong> excluído do banco de dados.</p>
-    </div>
-
-    <div class="confirmation-actions">
-      <button class="action-button action-cancel" @click="closeDeleteModalUser">Não</button>
-      <button class="action-button action-confirm" @click="confirmDeleteUser">Sim</button>
-    </div>
-
-  </div>
-</div>
-
-    <main class="admin-content">
-      <div class="admin-card">
-        <h2>Painel do Administrador</h2>
-        <p>Gerencie usuários e funcionalidades do sistema</p>
-
-        <!-- Botões de ação -->
-        <div class="admin-buttons">
-          <button @click="atualizarPEPS" class="admin-btn">
-            <span class="btn-icon">📊</span>
-            Atualizar PEPS
-          </button>
-          <button @click="atualizarContratos" class="admin-btn">
-            <span class="btn-icon">📋</span>
-            Atualizar Contratos
-          </button>
-          <button @click="arquivosMedicao" class="admin-btn">
-            <span class="btn-icon">📁</span>
-            Arquivos de Medição
-          </button>
-          <button @click="showUserForm = true" class="admin-btn">
-            <span class="btn-icon">👤</span>
-            Novo Usuário
-          </button>
-        </div>
-
-        <!-- Tabela de usuários -->
-        <div class="users-section">
-          <div class="users-header">
-            <h3>Usuários Cadastrados</h3>
-            <button @click="loadUsers" class="reload-btn" :disabled="isLoadingUsers">
-              <span v-if="isLoadingUsers">🔄</span>
-              <span v-else>↻</span>
-              Recarregar
-            </button>
-          </div>
-          <div class="table-container">
-            <div v-if="isLoadingUsers" class="loading-users">
-              <div class="loading-spinner"></div>
-              <span>Carregando usuários...</span>
-            </div>
-            <table v-else class="users-table">
-              <thead>
-                <tr>
-                  <th>Nome Completo</th>
-                  <th>Email</th>
-                  <th>Nível de Acesso</th>
-                  <th>Divisão</th>
-                  <th>Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="user in users" :key="user.id">
-                  <td>{{ user.name }}</td>
-                  <td>{{ user.email }}</td>
-                  <td>
-                    <span class="access-level" :class="user.nivel_acesso">
-                      {{ getAccessLevelLabel(user.nivel_acesso) }}
-                    </span>
-                  </td>
-                  <td>{{ user.divisao_id || '-' }}</td>
-                  <td class="actions">
-                    <button @click="editUser(user)" class="action-btn edit-btn" title="Editar">
-                      ✏️
-                    </button>
-                    <button @click="promptDeleteUser(user)" class="action-btn delete-btn" title="Excluir">
-                      🗑️
-                    </button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-            <div v-if="!isLoadingUsers && users.length === 0" class="no-users">
-              <div class="no-users-content">
-                <h4>Nenhum usuário cadastrado</h4>
-                <p>Verifique se:</p>
-                <ul>
-                  <li>O backend Laravel está rodando em <code>http://127.0.0.1:8000</code></li>
-                  <li>O endpoint <code>/api/v1/users</code> está funcionando</li>
-                  <li>Existem usuários cadastrados no banco de dados</li>
-                  <li>Você está autenticado (token válido)</li>
-                </ul>
-                <div class="test-buttons">
-                  <button @click="testApiConnection" class="test-api-btn">
-                    🔍 Testar Conexão com API
-                  </button>
-                  <button @click="testUserRegistration" class="test-api-btn">
-                    👤 Testar Cadastro de Usuário
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </main>
-
-    <!-- Modal de formulário de usuário -->
-    <div v-if="showUserForm" class="modal-overlay" @click="closeUserForm">
-      <div class="modal-content" @click.stop>
-        <div class="modal-header">
-          <h3>{{ editingUser ? 'Informações do Usuário' : 'Informações do Novo Usuário' }}</h3>
-          <button @click="closeUserForm" class="close-btn">&times;</button>
-    
-        </div>
-        <hr class="modal-hr"></hr>
-
-        <form @submit.prevent="saveUser" class="user-form">
-          <div class="form-group">
-            <label for="name">Nome Completo:</label>
-            <input type="text" id="name" v-model="formData.name" required :disabled="isLoading" placeholder="Nome do Colaborador" />
-          </div>
-
-          <div class="form-group">
-            <label for="email">E-mail:</label>
-            <input
-              type="email"
-              id="email"
-              v-model="formData.email"
-              required
-              :disabled="isLoading"
-              placeholder="E-mail de acesso do colaborador"
-            />
-          </div>
-
-          <div class="form-group">
-            <label for="password">Senha:</label>
-            <input
-              type="password"
-              id="password"
-              v-model="formData.password"
-              :required="!editingUser"
-              :disabled="isLoading"
-              placeholder="Mínimo de 8 caracteres, com letras e números."
-            />
-            <small v-if="editingUser" class="form-help"
-              >Deixe em branco para manter a senha atual</small
-            >
-          </div>
-<!-- 
-          <div v-if="!editingUser" class="form-group">
-            <label for="password_confirmation">Confirmar Senha:</label>
-            <input
-              type="password"
-              id="password_confirmation"
-              v-model="formData.password_confirmation"
-              :required="!editingUser"
-              :disabled="isLoading"
-            />
-          </div> -->
-              <div class="form-group">
-            <label for="nivel_acesso">Nível de Acesso:</label>
-            <select
-              id="nivel_acesso"
-              v-model="formData.nivel_acesso"
-              required
-              :disabled="isLoading"
-              :class="{ 'placeholder-color': !formData.nivel_acesso }"
-            >
-              <option value="" disabled selected>Defina a permissão do usuário</option>
-              <option value="admin">Administrador</option>
-              <option value="exata">Exata</option>
-              <option value="sabesp">SABESP</option>
-              <option value="usuario">Usuário</option>
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label for="divisao_id">Divisão ID (opcional):</label>
-            <input
-              type="number"
-              id="divisao_id"
-              v-model="formData.divisao_id"
-              :disabled="isLoading"
-              placeholder="Código da divisão (se aplicável)"
-            />
-          </div>
-
-
-          <!-- Mensagem de erro -->
-          <div v-if="errorMessage" class="error-message">
-            {{ errorMessage }}
-          </div>
-
-          <!-- Mensagem de sucesso -->
-          <div v-if="successMessage" class="success-message">
-            {{ successMessage }}
-          </div>
-
-          <div class="form-actions">
-                        <button type="submit" class="submit-btn" :disabled="isLoading">
-              <span v-if="isLoading">{{ editingUser ? 'Salvando...' : 'Cadastrando...' }}</span>
-              <span v-else>{{ editingUser ? 'Salvar' : 'Cadastrar' }}</span>
-            </button>
-            <button type="button" @click="closeUserForm" class="cancel-btn" :disabled="isLoading">
-              Cancelar
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  </div>
-</template>
-
 <style scoped>
 
 .admin-content {
@@ -635,7 +667,7 @@ const logout = () => {
 }
 
 .admin-btn {
-  background-color: #132c0d;
+  background-color: rgba(19, 44, 13, 0.8);
   color: white;
   padding: 1rem 1.5rem;
   border: none;
@@ -706,7 +738,7 @@ const logout = () => {
 .table-container {
   overflow-x: auto;
   overflow-y: auto;  /* <-- ADICIONADO: Permite o scroll vertical */
-  max-height: 48vh;
+  max-height: 63vh;
   border-radius: 8px;
   border: 1px solid #e0e0e0;
 }
@@ -718,8 +750,8 @@ const logout = () => {
 }
 
 .users-table th {
-  background-color: #f8f9fa;
-  color: #132c0d;
+  background-color: rgba(19, 44, 13, 0.6);
+  color: white;
   padding: 1rem;
   text-align: left;
   font-weight: 600;
@@ -727,9 +759,11 @@ const logout = () => {
 }
 
 .users-table td {
-  padding: 1rem;
-  border-bottom: 1px solid #e0e0e0;
-  vertical-align: middle;
+padding: 0.8rem 1rem;
+    font-size: 0.875rem;
+    border-bottom: 1px solid #e0e0e0;
+    vertical-align: middle;
+    white-space: nowrap;
 }
 
 .users-table tr:hover {
@@ -747,6 +781,7 @@ const logout = () => {
 .access-level.admin {
   background-color: #ffebee;
   color: #c62828;
+  
 }
 
 .access-level.exata {

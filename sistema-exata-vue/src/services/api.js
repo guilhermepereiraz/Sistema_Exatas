@@ -59,4 +59,16 @@ export const userApi = {
   deleteUser: (id) => api.delete(`/users/${id}`)
 }
 
+export const contratoApi = {
+  getContratos: () => api.get('/contratos'),
+
+  getContrato: (id) => api.get(`/contratos/${id}`),
+
+  createContrato: (contratoData) => api.post('/contratos', contratoData),
+
+  updateContrato: (id, contratoData) => api.put(`/contratos/${id}`, contratoData),
+
+  deleteContrato: (id) => api.delete(`/contratos/${id}`)
+}
+
 export default api

@@ -9,6 +9,10 @@ const router = useRouter()
 function irParaAdmin() {
   router.push({ name: 'admin' })
 }
+
+function irParaContrato () {
+  router.push({name: 'contrato'})
+}
 </script>
 
 <template>
@@ -18,7 +22,7 @@ function irParaAdmin() {
   </div>
   <div class="home_white">
     <div class="buttons">
-      <button class="bnt_imob">Imobilização</button>
+      <button class="bnt_imob" @click="irParaContrato">Imobilização</button>
       <button class="bnt_admin" @click="irParaAdmin">Painel do Administrador</button>
     </div>
 
