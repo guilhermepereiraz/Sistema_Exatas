@@ -6,8 +6,8 @@ import ContratoView from '../views/ContratosView.vue'
 import { authService } from '../services/auth'
 import HomePage from '@/views/HomePage.vue'
 import UserInfoPainel from '@/views/UserInfoPainel.vue'
-import Header_Principal from '@/views/Header_Principal.vue'
-import Header_Logout from '@/views/Header_Logout.vue'
+// import Header_Principal from '@/views/Header_Principal.vue'
+// import Header_Logout from '@/views/Header_Logout.vue'
 
 // Configuração das rotas da aplicação
 const router = createRouter({
@@ -59,7 +59,7 @@ router.beforeEach((to, from, next) => {
   }
   // Se está na página de login e já está autenticado
   else if (to.name === 'login' && authService.isAuthenticated()) {
-    next('/dashboard') // Redireciona para dashboard
+    next('/home') // Redireciona para dashboard
   }
   // Caso contrário, permite navegação normal
   else {

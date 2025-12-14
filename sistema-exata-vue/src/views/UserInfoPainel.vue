@@ -1,31 +1,24 @@
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { authService } from '../services/auth'
-
+import { userApi } from '../services/api'
 import HeaderLogout from './Header_Logout.vue'
 
+const router = useRouter()
 
 const userEmail = ref('')
 const userName = ref('')
 const userType = ref('')
-
-onMounted(() => {
-  const user = authService.getCurrentUser()
-  
-  // Se não há usuário logado, redireciona para login
-  if (!user) {
-    router.push('/')
-    return
-  }
-  
-  // Preenche dados do usuário para exibição
-  userEmail.value = user.email || 'N/A'
-  userName.value = user.name || 'Usuário'
-  userType.value = user.nivel_acesso || 'Usuário'
-})
+const userId = ref(null)
+const userPhotoUrl = ref(null)
 
 const isEditing = ref(false)
 const fileInput = ref(null)
+const selectedFile = ref(null)
+const isLoading = ref(false)
+const errorMessage = ref('')
+const successMessage = ref('')
 
 const isChangingPassword = ref(false)
 const oldPassword = ref('')
@@ -34,41 +27,258 @@ const newPassword = ref('')
 const placeholderAvatar = '/Imagens/Carregar_foto_perfil.png'
 
 const userData = ref({
-  nome: 'Guilherme(Teste)',
-  criadoEm: '24 de Fevereiro de 2025',
+  nome: '',
+  criadoEm: '',
   divisao: 'Santana - Mirante',
-  email: 'Guilherme@exatas.com.br(Teste)',
-  avatar: '/Imagens/3d_avatar_21.png',
+  email: '',
+  avatar: placeholderAvatar,
 })
 
 const originalUserData = ref(null)
 
-function editarPerfil() {
-  originalUserData.value = JSON.parse(JSON.stringify(userData.value))
-  userData.value.avatar = placeholderAvatar
-  isEditing.value = true
+// Helper para construir URL completa da foto
+function getPhotoUrl(photoUrl) {
+  if (!photoUrl) return placeholderAvatar
+  
+  // Se já é uma URL completa (http:// ou https://), retorna como está
+  if (photoUrl.startsWith('http://') || photoUrl.startsWith('https://')) {
+    return photoUrl
+  }
+  
+  // Se começa com /, adiciona baseURL da API
+  if (photoUrl.startsWith('/')) {
+    const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api/v1'
+    // Remove /api/v1 do final se existir, pois a foto está em storage público
+    const apiBase = baseURL.replace('/api/v1', '')
+    return `${apiBase}${photoUrl}`
+  }
+  
+  return photoUrl
 }
 
-function salvarAlteracoes() {
-  if (userData.value.avatar === placeholderAvatar) {
-    userData.value.avatar = originalUserData.value.avatar
+// Carrega dados do usuário da API
+async function loadUserData() {
+  try {
+    isLoading.value = true
+    errorMessage.value = ''
+    
+    const user = authService.getCurrentUser()
+    
+    if (!user || !user.id) {
+      router.push('/')
+      return
+    }
+    
+    userId.value = user.id
+    
+    // Busca dados completos do usuário da API
+    const response = await userApi.getUser(user.id)
+    const userDataFromApi = response.data.data || response.data
+    
+    // Preenche dados do usuário
+    userName.value = userDataFromApi.name || user.name || 'Usuário'
+    userEmail.value = userDataFromApi.email || user.email || 'N/A'
+    userType.value = userDataFromApi.nivel_acesso || user.nivel_acesso || 'Usuário'
+    
+    // Configura foto do usuário
+    if (userDataFromApi.photo_url) {
+      userPhotoUrl.value = userDataFromApi.photo_url
+      userData.value.avatar = getPhotoUrl(userDataFromApi.photo_url)
+    } else {
+      userPhotoUrl.value = null
+      userData.value.avatar = placeholderAvatar
+    }
+    
+    // Formata data de criação
+    if (userDataFromApi.created_at) {
+      const date = new Date(userDataFromApi.created_at)
+      userData.value.criadoEm = date.toLocaleDateString('pt-BR', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
+      })
+    }
+    
+    userData.value.nome = userName.value
+    userData.value.email = userEmail.value
+    
+  } catch (error) {
+    console.error('Erro ao carregar dados do usuário:', error)
+    errorMessage.value = 'Erro ao carregar dados do usuário. Tente novamente.'
+    
+    // Fallback para dados do localStorage
+    const user = authService.getCurrentUser()
+    if (user) {
+      userName.value = user.name || 'Usuário'
+      userEmail.value = user.email || 'N/A'
+      userData.value.nome = userName.value
+      userData.value.email = userEmail.value
+    }
+  } finally {
+    isLoading.value = false
   }
-  isEditing.value = false
+}
+
+onMounted(() => {
+  loadUserData()
+})
+
+function editarPerfil() {
+  originalUserData.value = JSON.parse(JSON.stringify(userData.value))
+  selectedFile.value = null
+  isEditing.value = true
+  errorMessage.value = ''
+  successMessage.value = ''
+}
+
+async function salvarAlteracoes() {
+  try {
+    isLoading.value = true
+    errorMessage.value = ''
+    successMessage.value = ''
+    
+    // Se há um arquivo selecionado, faz upload
+    if (selectedFile.value) {
+      const response = await userApi.uploadPhoto(userId.value, selectedFile.value)
+      
+      // Atualiza a URL da foto com a resposta da API
+      const photoUrl = response.data.data?.photo_url || response.data.photo_url
+      if (photoUrl) {
+        userPhotoUrl.value = photoUrl
+        userData.value.avatar = getPhotoUrl(photoUrl)
+      }
+      
+      // Limpa o arquivo selecionado
+      selectedFile.value = null
+      successMessage.value = 'Foto atualizada com sucesso!'
+    }
+    
+    // Atualiza nome e email se foram alterados
+    if (userName.value !== originalUserData.value.nome || 
+        userEmail.value !== originalUserData.value.email) {
+      await userApi.updateUser(userId.value, {
+        name: userName.value,
+        email: userEmail.value
+      })
+      successMessage.value = successMessage.value || 'Dados atualizados com sucesso!'
+    }
+    
+    // Atualiza dados no localStorage
+    const user = authService.getCurrentUser()
+    if (user) {
+      user.name = userName.value
+      user.email = userEmail.value
+      if (userPhotoUrl.value) {
+        user.photo_url = userPhotoUrl.value
+      }
+      localStorage.setItem('user_data', JSON.stringify(user))
+      
+      // Dispara evento para atualizar headers na mesma aba
+      window.dispatchEvent(new Event('userPhotoUpdated'))
+    }
+    
+    isEditing.value = false
+    
+    // Limpa mensagem de sucesso após 3 segundos
+    setTimeout(() => {
+      successMessage.value = ''
+    }, 3000)
+    
+  } catch (error) {
+    console.error('Erro ao salvar alterações:', error)
+    errorMessage.value = error.response?.data?.message || 
+                        error.response?.data?.error || 
+                        'Erro ao salvar alterações. Tente novamente.'
+  } finally {
+    isLoading.value = false
+  }
 }
 
 function cancelarAlteracao() {
-  userData.value = originalUserData.value
+  userData.value = JSON.parse(JSON.stringify(originalUserData.value))
+  userName.value = originalUserData.value.nome
+  userEmail.value = originalUserData.value.email
+  selectedFile.value = null
   isEditing.value = false
+  errorMessage.value = ''
+  successMessage.value = ''
+  
+  // Limpa o input de arquivo
+  if (fileInput.value) {
+    fileInput.value.value = ''
+  }
 }
 
 function triggerFileInput() {
-  fileInput.value.click()
+  fileInput.value?.click()
 }
 
 function onFileChange(event) {
   const file = event.target.files[0]
   if (file) {
+    // Validação do arquivo
+    const maxSize = 2 * 1024 * 1024 // 2MB
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif']
+    
+    if (!allowedTypes.includes(file.type)) {
+      errorMessage.value = 'Formato de arquivo não permitido. Use JPG, PNG ou GIF.'
+      return
+    }
+    
+    if (file.size > maxSize) {
+      errorMessage.value = 'Arquivo muito grande. Tamanho máximo: 2MB.'
+      return
+    }
+    
+    selectedFile.value = file
     userData.value.avatar = URL.createObjectURL(file)
+    errorMessage.value = ''
+  }
+}
+
+async function removePhoto() {
+  if (!confirm('Tem certeza que deseja remover sua foto de perfil?')) {
+    return
+  }
+  
+  try {
+    isLoading.value = true
+    errorMessage.value = ''
+    
+    await userApi.removePhoto(userId.value)
+    
+    userPhotoUrl.value = null
+    userData.value.avatar = placeholderAvatar
+    selectedFile.value = null
+    
+    // Atualiza dados no localStorage
+    const user = authService.getCurrentUser()
+    if (user) {
+      user.photo_url = null
+      localStorage.setItem('user_data', JSON.stringify(user))
+      
+      // Dispara evento para atualizar headers na mesma aba
+      window.dispatchEvent(new Event('userPhotoUpdated'))
+    }
+    
+    successMessage.value = 'Foto removida com sucesso!'
+    
+    // Limpa o input de arquivo
+    if (fileInput.value) {
+      fileInput.value.value = ''
+    }
+    
+    setTimeout(() => {
+      successMessage.value = ''
+    }, 3000)
+    
+  } catch (error) {
+    console.error('Erro ao remover foto:', error)
+    errorMessage.value = error.response?.data?.message || 
+                        error.response?.data?.error || 
+                        'Erro ao remover foto. Tente novamente.'
+  } finally {
+    isLoading.value = false
   }
 }
 
@@ -108,12 +318,38 @@ function hidePasswordFields() {
       </button>
 
       <div v-if="isEditing" class="action-buttons">
-        <button class="btn-salvar" @click="salvarAlteracoes">Salvar</button>
-        <button class="btn-cancelar" @click="cancelarAlteracao">Cancelar</button>
+        <button 
+          class="btn-salvar" 
+          @click="salvarAlteracoes"
+          :disabled="isLoading"
+        >
+          {{ isLoading ? 'Salvando...' : 'Salvar' }}
+        </button>
+        <button 
+          class="btn-cancelar" 
+          @click="cancelarAlteracao"
+          :disabled="isLoading"
+        >
+          Cancelar
+        </button>
       </div>
     </div>
 
     <hr class="hr_cima" />
+
+    <!-- Mensagens de feedback -->
+    <div v-if="errorMessage" class="message error-message">
+      {{ errorMessage }}
+    </div>
+    <div v-if="successMessage" class="message success-message">
+      {{ successMessage }}
+    </div>
+
+    <!-- Loading overlay -->
+    <div v-if="isLoading" class="loading-overlay">
+      <div class="loading-spinner"></div>
+      <p>Carregando...</p>
+    </div>
 
     <div class="user-details">
       <div class="detail-item item-nome">
@@ -124,7 +360,7 @@ function hidePasswordFields() {
 
       <div class="detail-item item-criado">
         <h1>Usuário Criado em:</h1>
-        <h2>{{ userData.criadoEm }}</h2>
+        <h2>{{ userData.criadoEm || 'Carregando...' }}</h2>
       </div>
 
       <div class="detail-item item-divisao">
@@ -133,13 +369,25 @@ function hidePasswordFields() {
       </div>
 
       <div class="detail-item item-avatar">
-        <img
-          :src="userData.avatar"
-          alt="Avatar do usuário"
-          class="avatar"
-          :class="{ 'editable-avatar': isEditing }"
-          @click="isEditing ? triggerFileInput() : null"
-        />
+        <div class="avatar-container">
+          <img
+            :src="userData.avatar"
+            alt="Avatar do usuário"
+            class="avatar"
+            :class="{ 'editable-avatar': isEditing }"
+            @click="isEditing ? triggerFileInput() : null"
+          />
+          <div v-if="isEditing" class="avatar-actions">
+            <button 
+              class="btn-remove-photo" 
+              @click="removePhoto"
+              :disabled="!userPhotoUrl && !selectedFile"
+              title="Remover foto"
+            >
+              Remover Foto
+            </button>
+          </div>
+        </div>
       </div>
 
       <div class="detail-item item-email">
@@ -457,6 +705,119 @@ img {
   background-color: #0f2410;
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(19, 44, 13, 0.3);
+}
+
+/* Mensagens de feedback */
+.message {
+  margin: 15px 55px;
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 500;
+  animation: slideIn 0.3s ease-out;
+}
+
+.error-message {
+  background-color: #fee;
+  color: #c33;
+  border: 1px solid #fcc;
+}
+
+.success-message {
+  background-color: #efe;
+  color: #3c3;
+  border: 1px solid #cfc;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Loading overlay */
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+}
+
+.loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 5px solid #f3f3f3;
+  border-top: 5px solid rgba(19, 44, 13, 0.8);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.loading-overlay p {
+  color: white;
+  margin-top: 20px;
+  font-size: 18px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Avatar container */
+.avatar-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+}
+
+.avatar-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.btn-remove-photo {
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: bold;
+  color: white;
+  background-color: rgba(139, 14, 14, 0.8);
+  border: 1px solid #8b0e0e;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-remove-photo:hover:not(:disabled) {
+  background-color: rgba(163, 8, 8, 0.8);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(139, 14, 14, 0.3);
+}
+
+.btn-remove-photo:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Botões desabilitados */
+.btn-salvar:disabled,
+.btn-cancelar:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
 }
 
 @media (max-width: 992px) {

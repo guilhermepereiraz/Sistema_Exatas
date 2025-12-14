@@ -2,12 +2,67 @@
 import IconUser from '@/components/icons/IconUser.vue'
 import IconSeta from '@/components/icons/IconSeta.vue'
 import { useRouter } from 'vue-router'
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { authService } from '../services/auth'
-const menuAberto = ref(false)
+import { userApi } from '../services/api'
 
+const menuAberto = ref(false)
 const router = useRouter()
 
+const userEmail = ref('')
+const userName = ref('')
+const userType = ref('')
+const userPhotoUrl = ref(null)
+const placeholderAvatar = '/Imagens/Carregar_foto_perfil.png'
+
+// Helper para construir URL completa da foto
+function getPhotoUrl(photoUrl) {
+  if (!photoUrl) return null
+  
+  // Se já é uma URL completa (http:// ou https://), retorna como está
+  if (photoUrl.startsWith('http://') || photoUrl.startsWith('https://')) {
+    return photoUrl
+  }
+  
+  // Se começa com /, adiciona baseURL da API
+  if (photoUrl.startsWith('/')) {
+    const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api/v1'
+    // Remove /api/v1 do final se existir, pois a foto está em storage público
+    const apiBase = baseURL.replace('/api/v1', '')
+    return `${apiBase}${photoUrl}`
+  }
+  
+  return photoUrl
+}
+
+// Carrega foto do usuário da API
+async function loadUserPhoto() {
+  try {
+    const user = authService.getCurrentUser()
+    if (!user || !user.id) return
+    
+    const response = await userApi.getUser(user.id)
+    const userData = response.data.data || response.data
+    
+    if (userData.photo_url) {
+      userPhotoUrl.value = getPhotoUrl(userData.photo_url)
+      // Atualiza também no localStorage
+      if (user) {
+        user.photo_url = userData.photo_url
+        localStorage.setItem('user_data', JSON.stringify(user))
+      }
+    } else {
+      userPhotoUrl.value = null
+    }
+  } catch (error) {
+    console.error('Erro ao carregar foto do usuário:', error)
+    // Fallback para foto do localStorage se existir
+    const user = authService.getCurrentUser()
+    if (user?.photo_url) {
+      userPhotoUrl.value = getPhotoUrl(user.photo_url)
+    }
+  }
+}
 
 function irParaPerfil() {
     router.push ({ name: 'perfil'})
@@ -17,9 +72,17 @@ function IrParaInicio() {
   router.push({name: 'home'})
 }
 
-const userEmail = ref('')
-const userName = ref('')
-const userType = ref('')
+// Observa mudanças no localStorage para atualizar foto quando alterada
+watch(() => {
+  const user = authService.getCurrentUser()
+  return user?.photo_url
+}, (newPhotoUrl) => {
+  if (newPhotoUrl) {
+    userPhotoUrl.value = getPhotoUrl(newPhotoUrl)
+  } else {
+    userPhotoUrl.value = null
+  }
+})
 
 // Carrega dados do usuário quando o componente é montado
 onMounted(() => {
@@ -35,6 +98,35 @@ onMounted(() => {
   userEmail.value = user.email || 'N/A'
   userName.value = user.name || 'Usuário'
   userType.value = user.nivel_acesso || 'Usuário'
+  
+  // Carrega foto do usuário
+  if (user.photo_url) {
+    userPhotoUrl.value = getPhotoUrl(user.photo_url)
+  } else {
+    loadUserPhoto()
+  }
+  
+  // Listener para atualizar foto quando localStorage mudar (de outras abas/componentes)
+  window.addEventListener('storage', (e) => {
+    if (e.key === 'user_data') {
+      const user = authService.getCurrentUser()
+      if (user?.photo_url) {
+        userPhotoUrl.value = getPhotoUrl(user.photo_url)
+      } else {
+        userPhotoUrl.value = null
+      }
+    }
+  })
+  
+  // Também escuta eventos customizados para atualização na mesma aba
+  window.addEventListener('userPhotoUpdated', () => {
+    const user = authService.getCurrentUser()
+    if (user?.photo_url) {
+      userPhotoUrl.value = getPhotoUrl(user.photo_url)
+    } else {
+      userPhotoUrl.value = null
+    }
+  })
 })
 
 const logout = () => {
@@ -51,7 +143,14 @@ const logout = () => {
     <div class="dados_principais">
       <img src="/Imagens/IconeExata.png" alt="Icone Exatas" v-on:click="IrParaInicio"/>
       <div class="dados_usuarios">
-        <IconUser class="icone-perfil" />
+        <!-- Mostra foto do usuário se existir, senão mostra o ícone padrão -->
+        <img 
+          v-if="userPhotoUrl" 
+          :src="userPhotoUrl" 
+          alt="Foto do usuário" 
+          class="icone-perfil foto-perfil"
+        />
+        <IconUser v-else class="icone-perfil" />
 
         <div class="info-texto">
           <h1>{{ userName }}</h1>
@@ -95,11 +194,26 @@ img:hover {
 .icone-perfil {
   width: 45px;
   height: 45px;
+  min-width: 45px;
+  min-height: 45px;
+  max-width: 45px;
+  max-height: 45px;
   color: white;
   margin-right: 15px;
   border: 3px solid white;
   border-radius: 50%;
-  flex-shrink: 0; /* MUITO IMPORTANTE: Impede que o ícone seja espremido e fique oval */
+  flex-shrink: 0;
+  aspect-ratio: 1 / 1; /* Garante proporção quadrada */
+  box-sizing: border-box; /* Inclui a borda no cálculo do tamanho */
+}
+
+.foto-perfil {
+  object-fit: cover;
+  object-position: center;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
 }
 
 .icone-seta {
@@ -193,9 +307,13 @@ img:hover {
   }
 
   .icone-perfil {
-    width: 40px;   /* Diminui o ícone do usuário */
+    width: 40px;
     height: 40px;
-    margin-right: 10px; /* Diminui a margem */
+    min-width: 40px;
+    min-height: 40px;
+    max-width: 40px;
+    max-height: 40px;
+    margin-right: 10px;
   }
 }
 
@@ -217,6 +335,10 @@ img:hover {
   .icone-perfil {
     width: 35px;
     height: 35px;
+    min-width: 35px;
+    min-height: 35px;
+    max-width: 35px;
+    max-height: 35px;
     border-width: 2px;
   }
 

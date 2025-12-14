@@ -1,7 +1,5 @@
 <script setup>
-import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { authService } from '../services/auth'
 import HeaderPrincipal from './Header_Principal.vue'
 
 const router = useRouter()

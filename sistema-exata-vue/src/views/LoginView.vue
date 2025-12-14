@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { authService } from '../services/auth'
+import { cadastroApi } from '../services/api'
 
 const router = useRouter()
 
@@ -13,12 +14,37 @@ const password = ref('')
 const isLoading = ref(false) // Controla estado de carregamento
 const errorMessage = ref('') // Mensagem de erro exibida ao usuário
 
+// Estados do modal de solicitação de cadastro
+const showCadastroModal = ref(false)
+const nomeSolicitacao = ref('')
+const motivoSolicitacao = ref('')
+const isLoadingSolicitacao = ref(false)
+const successMessage = ref('')
+const errorSolicitacao = ref('')
+
 // Validação do formulário
 const isFormValid = ref(false) // Indica se o formulário está válido para envio
 
 // Valida o formulário em tempo real
 const validateForm = () => {
   isFormValid.value = email.value.trim() !== '' && password.value.trim() !== ''
+}
+
+// Verifica se o erro é de email não cadastrado
+function isEmailNotRegistered(error) {
+  const status = error.response?.status
+  const message = error.response?.data?.message || error.message || ''
+  const errorMessage = message.toLowerCase()
+  
+  // Verifica se é erro 401/404 ou se a mensagem indica email não encontrado
+  return (
+    status === 401 || 
+    status === 404 ||
+    errorMessage.includes('não encontrado') ||
+    errorMessage.includes('não cadastrado') ||
+    errorMessage.includes('email não existe') ||
+    errorMessage.includes('credenciais inválidas')
+  )
 }
 
 // Função principal de login
@@ -29,6 +55,7 @@ async function fazerLogin() {
   // Ativa estado de carregamento e limpa mensagens de erro
   isLoading.value = true
   errorMessage.value = ''
+  showCadastroModal.value = false
 
   try {
     // Prepara credenciais para envio
@@ -45,12 +72,67 @@ async function fazerLogin() {
     router.push('/home')
   } catch (error) {
     console.error('Erro no login:', error)
-    // Exibe mensagem de erro para o usuário
-    errorMessage.value = error.message || 'Erro ao fazer login. Tente novamente.'
+    
+    // Verifica se o erro é de email não cadastrado
+    if (isEmailNotRegistered(error)) {
+      // Abre modal para solicitar cadastro
+      showCadastroModal.value = true
+      nomeSolicitacao.value = '' // Limpa campos do modal
+      motivoSolicitacao.value = ''
+      errorMessage.value = '' // Limpa mensagem de erro do login
+    } else {
+      // Exibe mensagem de erro para o usuário
+      errorMessage.value = error.response?.data?.message || error.message || 'Erro ao fazer login. Tente novamente.'
+    }
   } finally {
     // Desativa estado de carregamento independente do resultado
     isLoading.value = false
   }
+}
+
+// Função para enviar solicitação de cadastro
+async function enviarSolicitacaoCadastro() {
+  if (!email.value.trim()) {
+    errorSolicitacao.value = 'Email é obrigatório'
+    return
+  }
+
+  isLoadingSolicitacao.value = true
+  errorSolicitacao.value = ''
+  successMessage.value = ''
+
+  try {
+    await cadastroApi.solicitarCadastro(
+      email.value.trim(),
+      nomeSolicitacao.value.trim() || null,
+      motivoSolicitacao.value.trim() || null
+    )
+
+    successMessage.value = 'Solicitação enviada com sucesso! Entraremos em contato em breve.'
+    
+    // Fecha o modal após 3 segundos
+    setTimeout(() => {
+      showCadastroModal.value = false
+      nomeSolicitacao.value = ''
+      motivoSolicitacao.value = ''
+      successMessage.value = ''
+    }, 3000)
+
+  } catch (error) {
+    console.error('Erro ao enviar solicitação:', error)
+    errorSolicitacao.value = error.response?.data?.message || 'Erro ao enviar solicitação. Tente novamente.'
+  } finally {
+    isLoadingSolicitacao.value = false
+  }
+}
+
+// Função para fechar modal
+function fecharModalCadastro() {
+  showCadastroModal.value = false
+  nomeSolicitacao.value = ''
+  motivoSolicitacao.value = ''
+  errorSolicitacao.value = ''
+  successMessage.value = ''
 }
 
 // Função para recuperação de senha (a ser implementada)
@@ -120,7 +202,86 @@ function recuperarSenha() {
     <div class="cadastro-form">
       <img src="/Imagens/E__3_-removebg-preview (1).png" alt="Logo da Empresa" />
       <h3>Não possui acesso ainda?</h3>
-      <button>Enviar E-mail</button>
+      <button @click="showCadastroModal = true">Enviar E-mail</button>
+    </div>
+
+    <!-- Modal de Solicitação de Cadastro -->
+    <div v-if="showCadastroModal" class="modal-overlay" @click.self="fecharModalCadastro">
+      <div class="modal-content" @click.stop>
+        <div class="modal-header">
+          <h2>Solicitar Cadastro</h2>
+          <button @click="fecharModalCadastro" class="close-btn">&times;</button>
+        </div>
+
+        <div class="modal-body">
+          <p class="modal-description">
+            Seu email não está cadastrado no sistema. Preencha os dados abaixo para solicitar acesso.
+          </p>
+
+          <!-- Mensagens de feedback -->
+          <div v-if="errorSolicitacao" class="error-message-modal">
+            {{ errorSolicitacao }}
+          </div>
+          <div v-if="successMessage" class="success-message-modal">
+            {{ successMessage }}
+          </div>
+
+          <form @submit.prevent="enviarSolicitacaoCadastro">
+            <div class="form-group">
+              <label for="email-solicitacao">E-mail *</label>
+              <input
+                type="email"
+                id="email-solicitacao"
+                v-model="email"
+                required
+                :disabled="isLoadingSolicitacao"
+                placeholder="seu@email.com"
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="nome-solicitacao">Nome Completo</label>
+              <input
+                type="text"
+                id="nome-solicitacao"
+                v-model="nomeSolicitacao"
+                :disabled="isLoadingSolicitacao"
+                placeholder="Seu nome completo (opcional)"
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="motivo-solicitacao">Motivo da Solicitação</label>
+              <textarea
+                id="motivo-solicitacao"
+                v-model="motivoSolicitacao"
+                :disabled="isLoadingSolicitacao"
+                placeholder="Descreva o motivo da sua solicitação de acesso (opcional)"
+                rows="4"
+              ></textarea>
+            </div>
+
+            <div class="modal-actions">
+              <button
+                type="button"
+                @click="fecharModalCadastro"
+                class="btn-cancelar"
+                :disabled="isLoadingSolicitacao"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                class="btn-enviar"
+                :disabled="isLoadingSolicitacao || !email.trim()"
+              >
+                <span v-if="isLoadingSolicitacao">Enviando...</span>
+                <span v-else>Enviar Solicitação</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -359,6 +520,220 @@ function recuperarSenha() {
   .cadastro-form button {
     width: 80%; /* Botão mais largo e "tocável" */
     max-width: 300px;
+  }
+}
+
+/* --- Modal de Solicitação de Cadastro --- */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 500px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.modal-header h2 {
+  margin: 0;
+  color: #132c0d;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 28px;
+  cursor: pointer;
+  color: #666;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.close-btn:hover {
+  background-color: #f0f0f0;
+  color: #333;
+}
+
+.modal-body {
+  padding: 20px;
+}
+
+.modal-description {
+  color: #666;
+  margin-bottom: 20px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  color: #333;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.form-group input,
+.form-group textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+  box-sizing: border-box;
+  transition: border-color 0.2s ease;
+}
+
+.form-group input:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: #132c0d;
+}
+
+.form-group input:disabled,
+.form-group textarea:disabled {
+  background-color: #f5f5f5;
+  cursor: not-allowed;
+}
+
+.form-group textarea {
+  resize: vertical;
+  min-height: 100px;
+}
+
+.error-message-modal {
+  background-color: #ffebee;
+  color: #c62828;
+  padding: 12px;
+  border-radius: 6px;
+  margin-bottom: 20px;
+  border-left: 4px solid #c62828;
+  font-size: 14px;
+}
+
+.success-message-modal {
+  background-color: #e8f5e8;
+  color: #2e7d32;
+  padding: 12px;
+  border-radius: 6px;
+  margin-bottom: 20px;
+  border-left: 4px solid #2e7d32;
+  font-size: 14px;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 24px;
+}
+
+.btn-cancelar,
+.btn-enviar {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-cancelar {
+  background-color: #f5f5f5;
+  color: #333;
+}
+
+.btn-cancelar:hover:not(:disabled) {
+  background-color: #e0e0e0;
+}
+
+.btn-enviar {
+  background-color: #132c0d;
+  color: white;
+}
+
+.btn-enviar:hover:not(:disabled) {
+  background-color: #1a3a11;
+  transform: translateY(-1px);
+}
+
+.btn-cancelar:disabled,
+.btn-enviar:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Responsividade do Modal */
+@media (max-width: 600px) {
+  .modal-content {
+    max-width: 100%;
+    margin: 10px;
+  }
+
+  .modal-header {
+    padding: 15px;
+  }
+
+  .modal-body {
+    padding: 15px;
+  }
+
+  .modal-actions {
+    flex-direction: column;
+  }
+
+  .btn-cancelar,
+  .btn-enviar {
+    width: 100%;
   }
 }
 </style>

@@ -102,6 +102,49 @@
                 </tr>
               </tbody>
             </table>
+            
+            <!-- Controles de Paginação -->
+            <div v-if="!isLoadingUsers && users.length > 0" class="pagination-container">
+              <div class="pagination-info">
+                <span>
+                  Mostrando {{ getUsersRange().start }} a {{ getUsersRange().end }} 
+                  de {{ totalUsers }} usuário{{ totalUsers !== 1 ? 's' : '' }}
+                </span>
+              </div>
+              
+              <div class="pagination-controls">
+                <button 
+                  @click="goToPage(currentPage - 1)" 
+                  :disabled="currentPage === 1 || isLoadingUsers"
+                  class="pagination-btn"
+                  title="Página anterior"
+                >
+                  ← Anterior
+                </button>
+                
+                <div class="pagination-pages">
+                  <button
+                    v-for="page in getPageNumbers()"
+                    :key="page"
+                    @click="goToPage(page)"
+                    :disabled="isLoadingUsers"
+                    :class="['pagination-page-btn', { 'active': page === currentPage, 'ellipsis': page === '...' }]"
+                  >
+                    {{ page }}
+                  </button>
+                </div>
+                
+                <button 
+                  @click="goToPage(currentPage + 1)" 
+                  :disabled="currentPage >= totalPages || isLoadingUsers"
+                  class="pagination-btn"
+                  title="Próxima página"
+                >
+                  Próxima →
+                </button>
+              </div>
+            </div>
+            
             <div v-if="!isLoadingUsers && users.length === 0" class="no-users">
               <div class="no-users-content">
                 <h4>Nenhum usuário cadastrado</h4>
@@ -142,6 +185,13 @@
     <PopupLoadView v-if="showCji3Popup" 
     title="Carregar CJI3" @close="showCji3Popup = false"/>
 
+    <PopupLoadView 
+      v-if="showPepsPopup" 
+      title="Carregar PEPS" 
+      @close="showPepsPopup = false"
+      @upload="handlePepsUpload"
+    />
+
     <!-- Modal de formulário de usuário -->
     <div v-if="showUserForm" class="modal-overlay" @click="closeUserForm">
       <div class="modal-content" @click.stop>
@@ -150,7 +200,7 @@
           <button @click="closeUserForm" class="close-btn">&times;</button>
     
         </div>
-        <hr class="modal-hr"></hr>
+        <hr class="modal-hr" />
 
         <form @submit.prevent="saveUser" class="user-form">
           <div class="form-group">
@@ -253,18 +303,20 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { authService } from '../services/auth'
-import api, { userApi } from '../services/api'
+import { userApi, pepsApi } from '../services/api'
 import HeaderNoHR from './Header_no_HR.vue'
 import PopupLoadView  from './PopupLoadView.vue'
 
 const router = useRouter()
 
-// Dados do usuário para exibição no header
-const userName = ref('')
-const userType = ref('')
-
 // Lista de usuários
 const users = ref([])
+
+// Paginação
+const currentPage = ref(1)
+const totalPages = ref(1)
+const totalUsers = ref(0)
+
 
 // Estados do modal e formulário
 const showUserForm = ref(false)
@@ -274,6 +326,7 @@ const showDenominacaoPopup = ref(false);
 const showCadastroQauntPopup = ref(false);
 const showContratosPopup = ref(false);
 const showCji3Popup = ref(false);
+const showPepsPopup = ref(false);
 
 // Dados do formulário de cadastro
 const formData = ref({
@@ -306,56 +359,166 @@ onMounted(async () => {
     return
   }
 
-  // Preenche dados do usuário para exibição
-  userName.value = user.name || 'Usuário'
-  userType.value = user.nivel_acesso || 'Usuário'
-
   // Carrega lista de usuários
-  await loadUsers()
+  await loadUsers(1)
 })
 
 // Carrega lista de usuários
-async function loadUsers() {
+async function loadUsers(page = 1) {
   isLoadingUsers.value = true
+  errorMessage.value = ''
+  
+  console.log('loadUsers chamado com página:', page)
+  
   try {
-    const response = await userApi.getUsers()
-    console.log('Resposta completa da API:', response)
-    console.log('Status da resposta:', response.status)
-    console.log('Dados da resposta:', response.data)
+    const response = await userApi.getUsers(page, 10)
+    
+    console.log('Resposta da API:', response.data)
 
-    // Verifica se a resposta tem a estrutura esperada
-    if (response.data && Array.isArray(response.data)) {
-      // Se response.data é um array direto
-      users.value = response.data
-      console.log('Usuários carregados (array direto):', users.value.length)
-    } else if (response.data && response.data.data && Array.isArray(response.data.data)) {
-      // Se response.data tem uma propriedade 'data' que é um array
-      users.value = response.data.data
-      console.log('Usuários carregados (data.data):', users.value.length)
-    } else if (response.data && response.data.users && Array.isArray(response.data.users)) {
-      // Se response.data tem uma propriedade 'users' que é um array
-      users.value = response.data.users
-      console.log('Usuários carregados (data.users):', users.value.length)
+    // Laravel Paginator response structure (UserCollection)
+    // A resposta vem como: { data: [...], meta: {...}, links: {...} }
+    if (response.data) {
+      // Verifica se é a estrutura do Laravel Resource Collection
+      if (response.data.data && Array.isArray(response.data.data) && response.data.meta) {
+        users.value = response.data.data
+        currentPage.value = response.data.meta.current_page || page
+        totalPages.value = response.data.meta.last_page || 1
+        totalUsers.value = response.data.meta.total || 0
+        
+        console.log('Paginação atualizada:', {
+          currentPage: currentPage.value,
+          totalPages: totalPages.value,
+          totalUsers: totalUsers.value,
+          usersCount: users.value.length
+        })
+      } 
+      // Fallback: se data é um array direto (sem paginação)
+      else if (Array.isArray(response.data)) {
+        users.value = response.data
+        totalPages.value = 1
+        currentPage.value = 1
+        totalUsers.value = response.data.length
+        console.log('Resposta sem paginação (array direto)')
+      } 
+      // Fallback: estrutura alternativa
+      else if (response.data.users && Array.isArray(response.data.users)) {
+        users.value = response.data.users
+        currentPage.value = response.data.current_page || page
+        totalPages.value = response.data.last_page || 1
+        totalUsers.value = response.data.total || response.data.users.length
+        console.log('Estrutura alternativa detectada')
+      } 
+      else {
+        console.warn('Formato de resposta inesperado:', response.data)
+        users.value = []
+        totalPages.value = 1
+        currentPage.value = 1
+        totalUsers.value = 0
+      }
     } else {
-      console.warn('Formato de resposta inesperado:', response.data)
-      console.log('Tipo de response.data:', typeof response.data)
-      console.log('É array?', Array.isArray(response.data))
+      console.warn('Resposta sem data')
       users.value = []
+      totalPages.value = 1
+      currentPage.value = 1
+      totalUsers.value = 0
     }
   } catch (error) {
     console.error('Erro ao carregar usuários:', error)
-    console.error('Detalhes do erro:', error.response)
+    console.error('Detalhes do erro:', {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status
+    })
     errorMessage.value =
-      'Erro ao carregar lista de usuários: ' + (error.message || 'Erro desconhecido')
+      'Erro ao carregar lista de usuários: ' + (error.response?.data?.message || error.message || 'Erro desconhecido')
     users.value = []
+    totalPages.value = 1
+    currentPage.value = 1
+    totalUsers.value = 0
   } finally {
     isLoadingUsers.value = false
   }
 }
 
+// Navega para uma página específica
+function goToPage(page) {
+  // Valida se a página é válida (não pode ser string como '...')
+  if (typeof page === 'string' || page === '...' || isNaN(page)) {
+    return
+  }
+  
+  const targetPage = parseInt(page, 10)
+  
+  // Valida se a página está dentro do range válido
+  if (targetPage < 1 || targetPage > totalPages.value) {
+    console.warn('Página fora do range:', { targetPage, totalPages: totalPages.value })
+    return
+  }
+  
+  // Evita recarregar a mesma página
+  if (targetPage === currentPage.value) {
+    return
+  }
+  
+  // Carrega a página
+  loadUsers(targetPage)
+  
+  // Scroll para o topo da tabela após um pequeno delay
+  setTimeout(() => {
+    const tableContainer = document.querySelector('.table-container')
+    if (tableContainer) {
+      tableContainer.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    } else {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  }, 100)
+}
+
+// Gera array de números de página para exibição (com ellipsis)
+function getPageNumbers() {
+  const pages = []
+  const total = totalPages.value
+  const current = currentPage.value
+  
+  if (total <= 7) {
+    // Se há 7 ou menos páginas, mostra todas
+    for (let i = 1; i <= total; i++) {
+      pages.push(i)
+    }
+  } else {
+    // Sempre mostra primeira página
+    pages.push(1)
+    
+    if (current <= 3) {
+      // Perto do início
+      for (let i = 2; i <= 4; i++) {
+        pages.push(i)
+      }
+      pages.push('...')
+      pages.push(total)
+    } else if (current >= total - 2) {
+      // Perto do fim
+      pages.push('...')
+      for (let i = total - 3; i <= total; i++) {
+        pages.push(i)
+      }
+    } else {
+      // No meio
+      pages.push('...')
+      for (let i = current - 1; i <= current + 1; i++) {
+        pages.push(i)
+      }
+      pages.push('...')
+      pages.push(total)
+    }
+  }
+  
+  return pages
+}
+
 // Funções dos botões de ação
 function atualizarPEPS() {
-  showCji3Popup.value = true;
+  showPepsPopup.value = true;
 }
 
 function atualizarContratos() {
@@ -414,8 +577,7 @@ async function saveUser() {
 
     console.log('Usuário salvo:', response.data)
 
-    // Recarrega lista de usuários
-    await loadUsers()
+    await loadUsers(currentPage.value)
 
     // Fecha modal após 2 segundos
     setTimeout(() => {
@@ -462,7 +624,7 @@ async function confirmDeleteUser() {
     await userApi.deleteUser(userToDelete.value.id) // Usa o ID salvo
     successMessage.value = 'Usuário excluído com sucesso!'
     closeDeleteModalUser() 
-    await loadUsers()
+    await loadUsers(currentPage.value)
   } catch (error) {
     console.error('Erro ao excluir usuário:', error)
     errorMessage.value = 'Erro ao excluir usuário. Tente novamente.'
@@ -621,16 +783,103 @@ function getAccessLevelLabel(nivel) {
   return labels[nivel] || nivel
 }
 
-// Volta para o dashboard
-const goBack = () => {
-  router.push('/dashboard')
+// Função helper para calcular range de usuários exibidos
+function getUsersRange() {
+  const start = ((currentPage.value - 1) * 10) + 1
+  const end = Math.min(currentPage.value * 10, totalUsers.value)
+  return { start, end }
 }
 
-// Função de logout - limpa dados e redireciona para login
-const logout = () => {
-  authService.logout()
-  router.push('/')
+// Função para upload de PEPS
+async function handlePepsUpload(file) {
+  try {
+    isLoading.value = true
+    errorMessage.value = ''
+    successMessage.value = ''
+
+    const response = await pepsApi.uploadPeps(file)
+    
+    // O controller retorna: { message, statistics: { total_imported, total_skipped, total_failed }, failures? }
+    const statistics = response.data.statistics || {}
+    const totalImported = statistics.total_imported || 0
+    const totalSkipped = statistics.total_skipped || 0
+    const totalFailed = statistics.total_failed || 0
+    const failures = response.data.failures || []
+
+    let message = `✅ ${response.data.message || 'PEPS processado com sucesso!'}\n\n`
+    message += `📥 Importados: ${totalImported}\n`
+    message += `⏭️ Ignorados: ${totalSkipped}\n`
+    message += `❌ Falhas: ${totalFailed}`
+    
+    if (failures.length > 0) {
+      message += `\n\n⚠️ Detalhes das falhas:`
+      failures.slice(0, 5).forEach((failure, index) => {
+        message += `\n  Linha ${failure.row}: ${failure.errors?.join(', ') || 'Erro desconhecido'}`
+      })
+      if (failures.length > 5) {
+        message += `\n  ... e mais ${failures.length - 5} falha(s)`
+      }
+      console.warn('Falhas no processamento:', failures)
+    }
+
+    successMessage.value = message
+    showPepsPopup.value = false
+
+    setTimeout(() => {
+      successMessage.value = ''
+    }, 8000) // Aumentado para 8 segundos para dar tempo de ler
+
+  } catch (error) {
+    console.error('Erro ao fazer upload de PEPS:', error)
+    
+    // Tratamento específico para erros de validação (422)
+    if (error.response?.status === 422) {
+      const errors = error.response.data.errors || []
+      let errorMsg = error.response.data.message || 'Erro ao processar arquivo. Algumas linhas contêm erros.'
+      
+      if (errors.length > 0) {
+        errorMsg += '\n\nDetalhes:'
+        errors.slice(0, 5).forEach((err, index) => {
+          errorMsg += `\n  Linha ${err.row}: ${err.errors?.join(', ') || 'Erro desconhecido'}`
+        })
+        if (errors.length > 5) {
+          errorMsg += `\n  ... e mais ${errors.length - 5} erro(s)`
+        }
+      }
+      
+      errorMessage.value = errorMsg
+    } else {
+      errorMessage.value = error.response?.data?.message || 
+                          error.response?.data?.error || 
+                          'Erro ao fazer upload do arquivo PEPS. Verifique o formato do arquivo e tente novamente.'
+    }
+  } finally {
+    isLoading.value = false
+  }
 }
+
+// Funções placeholder para outros uploads
+function handleDenominacaoUpload(file) {
+  console.log('Upload de Denominação:', file)
+  // Implementar quando necessário
+}
+
+function handleCadastroQuantUpload(file) {
+  console.log('Upload de Cadastro Quantitativo:', file)
+  // Implementar quando necessário
+}
+
+function handleContratosUpload(file) {
+  console.log('Upload de Contratos:', file)
+  // Implementar quando necessário
+}
+
+function handleCji3Upload(file) {
+  console.log('Upload de CJI3:', file)
+  // Implementar quando necessário
+}
+
+
 </script>
 
 <style scoped>
@@ -821,6 +1070,106 @@ padding: 0.8rem 1rem;
 
 .delete-btn:hover {
   background-color: #ffebee;
+}
+
+/* Controles de Paginação */
+.pagination-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background-color: #f9f9f9;
+  border-radius: 8px;
+  border-top: 2px solid #e0e0e0;
+}
+
+.pagination-info {
+  text-align: center;
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.pagination-controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.pagination-btn {
+  padding: 0.5rem 1rem;
+  border: 1px solid #ddd;
+  background-color: white;
+  color: #333;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+  min-width: 100px;
+}
+
+.pagination-btn:hover:not(:disabled) {
+  background-color: rgba(19, 44, 13, 0.8);
+  color: white;
+  border-color: rgba(19, 44, 13, 0.8);
+  transform: translateY(-1px);
+}
+
+.pagination-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background-color: #f5f5f5;
+}
+
+.pagination-pages {
+  display: flex;
+  gap: 0.25rem;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.pagination-page-btn {
+  min-width: 40px;
+  height: 40px;
+  padding: 0.5rem;
+  border: 1px solid #ddd;
+  background-color: white;
+  color: #333;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pagination-page-btn:hover:not(:disabled):not(.ellipsis) {
+  background-color: #f0f0f0;
+  border-color: rgba(19, 44, 13, 0.5);
+}
+
+.pagination-page-btn.active {
+  background-color: rgba(19, 44, 13, 0.8);
+  color: white;
+  border-color: rgba(19, 44, 13, 0.8);
+  font-weight: 600;
+}
+
+.pagination-page-btn.ellipsis {
+  cursor: default;
+  border: none;
+  background-color: transparent;
+  min-width: auto;
+  padding: 0 0.25rem;
+}
+
+.pagination-page-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .no-users {
