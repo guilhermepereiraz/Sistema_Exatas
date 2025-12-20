@@ -58,14 +58,9 @@
 
         <!-- Tabela de usuários -->
         <div class="users-section">
-          <!-- <div class="users-header">
-            <h3>Usuários Cadastrados</h3>
-            <button @click="loadUsers" class="reload-btn" :disabled="isLoadingUsers">
-              <span v-if="isLoadingUsers">🔄</span>
-              <span v-else>↻</span>
-              Recarregar
-            </button>
-          </div> -->
+          <div class="users-header">
+            <h3>Usuários Cadastrados no Sistema</h3>
+          </div>
           <div class="table-container">
             <div v-if="isLoadingUsers" class="loading-users">
               <div class="loading-spinner"></div>
@@ -110,6 +105,11 @@
                   Mostrando {{ getUsersRange().start }} a {{ getUsersRange().end }} 
                   de {{ totalUsers }} usuário{{ totalUsers !== 1 ? 's' : '' }}
                 </span>
+                <!-- Debug info (remover depois) -->
+                <div style="font-size: 0.75rem; color: #999; margin-top: 0.25rem;">
+                  Página {{ currentPage }} de {{ totalPages }} | 
+                  Botão desabilitado: {{ currentPage >= totalPages || isLoadingUsers ? 'Sim' : 'Não' }}
+                </div>
               </div>
               
               <div class="pagination-controls">
@@ -138,7 +138,7 @@
                   @click="goToPage(currentPage + 1)" 
                   :disabled="currentPage >= totalPages || isLoadingUsers"
                   class="pagination-btn"
-                  title="Próxima página"
+                  :title="`Próxima página (${currentPage + 1} de ${totalPages})`"
                 >
                   Próxima →
                 </button>
@@ -192,6 +192,22 @@
       @upload="handlePepsUpload"
     />
 
+    <!-- Popup de Feedback (Sucesso/Erro) -->
+    <div v-if="showFeedbackPopup" class="feedback-popup-overlay" @click.self="closeFeedbackPopup">
+      <div class="feedback-popup-content" :class="feedbackType" @click.stop>
+        <div class="feedback-popup-icon">
+          <span v-if="feedbackType === 'success'">✅</span>
+          <span v-else>❌</span>
+        </div>
+        <div class="feedback-popup-message">
+          {{ feedbackMessage }}
+        </div>
+        <button @click="closeFeedbackPopup" class="feedback-popup-close">
+          OK
+        </button>
+      </div>
+    </div>
+
     <!-- Modal de formulário de usuário -->
     <div v-if="showUserForm" class="modal-overlay" @click="closeUserForm">
       <div class="modal-content" @click.stop>
@@ -234,17 +250,21 @@
               >Deixe em branco para manter a senha atual</small
             >
           </div>
-<!-- 
-          <div v-if="!editingUser" class="form-group">
+
+          <div class="form-group">
             <label for="password_confirmation">Confirmar Senha:</label>
             <input
               type="password"
               id="password_confirmation"
               v-model="formData.password_confirmation"
-              :required="!editingUser"
+              :required="!editingUser || (editingUser && formData.password)"
               :disabled="isLoading"
+              placeholder="Confirme a senha"
             />
-          </div> -->
+            <small v-if="editingUser && formData.password" class="form-help"
+              >Confirme a nova senha</small
+            >
+          </div>
               <div class="form-group">
             <label for="nivel_acesso">Nível de Acesso:</label>
             <select
@@ -263,14 +283,26 @@
           </div>
 
           <div class="form-group">
-            <label for="divisao_id">Divisão ID (opcional):</label>
-            <input
-              type="number"
+            <label for="divisao_id">Divisão (opcional):</label>
+            <select
               id="divisao_id"
               v-model="formData.divisao_id"
-              :disabled="isLoading"
-              placeholder="Código da divisão (se aplicável)"
-            />
+              :disabled="isLoading || isLoadingDivisoes || divisoes.length === 0"
+            >
+              <option :value="null" selected>
+                {{ isLoadingDivisoes ? 'Carregando divisões...' : 'Selecione uma divisão (opcional)' }}
+              </option>
+              <option
+                v-for="divisao in divisoes"
+                :key="divisao.id"
+                :value="divisao.id"
+              >
+                ID: {{ divisao.id }} - {{ divisao.nome }}
+              </option>
+            </select>
+            <small v-if="errorDivisoes" class="form-help error-divisoes">
+              {{ errorDivisoes }} <button type="button" class="link-button" @click="loadDivisoes" :disabled="isLoadingDivisoes">Tentar novamente</button>
+            </small>
           </div>
 
 
@@ -303,7 +335,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { authService } from '../services/auth'
-import { userApi, pepsApi } from '../services/api'
+import { userApi, pepsApi, divisaoApi } from '../services/api'
 import HeaderNoHR from './Header_no_HR.vue'
 import PopupLoadView  from './PopupLoadView.vue'
 
@@ -338,6 +370,11 @@ const formData = ref({
   divisao_id: null,
 })
 
+// Divisões para dropdown
+const divisoes = ref([])
+const isLoadingDivisoes = ref(false)
+const errorDivisoes = ref('')
+
 // Estados da interface
 const isLoading = ref(false)
 const isLoadingUsers = ref(false)
@@ -346,6 +383,11 @@ const successMessage = ref('')
 
 const isDeleteUser = ref(false)
 const userToDelete = ref(null)
+
+// Estados do popup de feedback
+const showFeedbackPopup = ref(false)
+const feedbackMessage = ref('')
+const feedbackType = ref('success') // 'success' ou 'error'
 
 
 
@@ -361,73 +403,133 @@ onMounted(async () => {
 
   // Carrega lista de usuários
   await loadUsers(1)
+
+  // Carrega divisões para o dropdown
+  await loadDivisoes()
 })
+
+// Carrega divisões da API
+async function loadDivisoes() {
+  try {
+    isLoadingDivisoes.value = true
+    errorDivisoes.value = ''
+
+    const response = await divisaoApi.getDivisoes()
+
+    if (Array.isArray(response.data)) {
+      divisoes.value = response.data
+    } else if (response.data.data && Array.isArray(response.data.data)) {
+      divisoes.value = response.data.data
+    } else if (response.data.divisoes && Array.isArray(response.data.divisoes)) {
+      divisoes.value = response.data.divisoes
+    } else {
+      console.warn('Formato de resposta inesperado para divisões:', response.data)
+      divisoes.value = []
+    }
+  } catch (error) {
+    console.error('Erro ao carregar divisões:', error)
+    errorDivisoes.value = 'Erro ao carregar divisões. Tente novamente.'
+    divisoes.value = []
+  } finally {
+    isLoadingDivisoes.value = false
+  }
+}
 
 // Carrega lista de usuários
 async function loadUsers(page = 1) {
   isLoadingUsers.value = true
   errorMessage.value = ''
   
-  console.log('loadUsers chamado com página:', page)
+  console.log('=== loadUsers INICIADO ===')
+  console.log('Página solicitada:', page)
+  console.log('Estado atual:', {
+    currentPage: currentPage.value,
+    totalPages: totalPages.value,
+    totalUsers: totalUsers.value
+  })
   
   try {
+    console.log('Fazendo requisição para API com page:', page, 'limit: 10')
     const response = await userApi.getUsers(page, 10)
     
-    console.log('Resposta da API:', response.data)
+    console.log('=== RESPOSTA DA API ===')
+    console.log('Response completo:', response)
+    console.log('Response.data:', response.data)
+    console.log('Tipo de response.data:', typeof response.data)
+    console.log('É array?', Array.isArray(response.data))
 
     // Laravel Paginator response structure (UserCollection)
     // A resposta vem como: { data: [...], meta: {...}, links: {...} }
     if (response.data) {
       // Verifica se é a estrutura do Laravel Resource Collection
       if (response.data.data && Array.isArray(response.data.data) && response.data.meta) {
-        users.value = response.data.data
-        currentPage.value = response.data.meta.current_page || page
-        totalPages.value = response.data.meta.last_page || 1
-        totalUsers.value = response.data.meta.total || 0
+        console.log('✅ Estrutura Laravel Resource Collection detectada')
+        console.log('Dados recebidos:', response.data.data.length, 'usuários')
+        console.log('Meta completa:', JSON.stringify(response.data.meta, null, 2))
         
-        console.log('Paginação atualizada:', {
+        // Força atualização reativa
+        users.value = [...response.data.data]
+        
+        // Garante que os valores são números
+        const meta = response.data.meta
+        currentPage.value = Number(meta.current_page) || Number(page)
+        totalPages.value = Number(meta.last_page) || Math.ceil((Number(meta.total) || 0) / 10) || 1
+        totalUsers.value = Number(meta.total) || 0
+        
+        // Validação adicional: se totalPages não foi calculado corretamente, calcula manualmente
+        if (totalPages.value === 1 && totalUsers.value > 10) {
+          totalPages.value = Math.ceil(totalUsers.value / 10)
+          console.warn('⚠️ totalPages recalculado manualmente:', totalPages.value)
+        }
+        
+        console.log('✅ Paginação atualizada:', {
           currentPage: currentPage.value,
           totalPages: totalPages.value,
           totalUsers: totalUsers.value,
-          usersCount: users.value.length
+          usersCount: users.value.length,
+          primeiroUsuario: users.value[0]?.email || 'N/A',
+          ultimoUsuario: users.value[users.value.length - 1]?.email || 'N/A',
+          botaoProximoDesabilitado: currentPage.value >= totalPages.value
         })
       } 
       // Fallback: se data é um array direto (sem paginação)
       else if (Array.isArray(response.data)) {
-        users.value = response.data
+        console.log('⚠️ Resposta sem paginação (array direto)')
+        users.value = [...response.data]
         totalPages.value = 1
         currentPage.value = 1
         totalUsers.value = response.data.length
-        console.log('Resposta sem paginação (array direto)')
       } 
       // Fallback: estrutura alternativa
       else if (response.data.users && Array.isArray(response.data.users)) {
-        users.value = response.data.users
-        currentPage.value = response.data.current_page || page
-        totalPages.value = response.data.last_page || 1
-        totalUsers.value = response.data.total || response.data.users.length
-        console.log('Estrutura alternativa detectada')
+        console.log('⚠️ Estrutura alternativa detectada')
+        users.value = [...response.data.users]
+        currentPage.value = Number(response.data.current_page) || Number(page)
+        totalPages.value = Number(response.data.last_page) || 1
+        totalUsers.value = Number(response.data.total) || response.data.users.length
       } 
       else {
-        console.warn('Formato de resposta inesperado:', response.data)
+        console.warn('❌ Formato de resposta inesperado:', response.data)
+        console.warn('Chaves do objeto:', Object.keys(response.data))
         users.value = []
         totalPages.value = 1
         currentPage.value = 1
         totalUsers.value = 0
       }
     } else {
-      console.warn('Resposta sem data')
+      console.warn('❌ Resposta sem data')
       users.value = []
       totalPages.value = 1
       currentPage.value = 1
       totalUsers.value = 0
     }
   } catch (error) {
-    console.error('Erro ao carregar usuários:', error)
+    console.error('❌ Erro ao carregar usuários:', error)
     console.error('Detalhes do erro:', {
       message: error.message,
       response: error.response?.data,
-      status: error.response?.status
+      status: error.response?.status,
+      config: error.config
     })
     errorMessage.value =
       'Erro ao carregar lista de usuários: ' + (error.response?.data?.message || error.message || 'Erro desconhecido')
@@ -437,31 +539,58 @@ async function loadUsers(page = 1) {
     totalUsers.value = 0
   } finally {
     isLoadingUsers.value = false
+    console.log('=== loadUsers FINALIZADO ===')
   }
 }
 
 // Navega para uma página específica
-function goToPage(page) {
+async function goToPage(page) {
+  console.log('=== goToPage INICIADO ===')
+  console.log('goToPage chamado com:', { page, type: typeof page })
+  
   // Valida se a página é válida (não pode ser string como '...')
-  if (typeof page === 'string' || page === '...' || isNaN(page)) {
+  if (typeof page === 'string' && page !== '...' && isNaN(Number(page))) {
+    console.warn('❌ Página inválida (string não numérica):', page)
     return
   }
   
-  const targetPage = parseInt(page, 10)
+  if (page === '...') {
+    console.warn('❌ Tentativa de navegar para ellipsis')
+    return
+  }
+  
+  const targetPage = Number(page)
+  
+  if (isNaN(targetPage)) {
+    console.warn('❌ Página não é um número:', page)
+    return
+  }
+  
+  console.log('Página convertida:', { targetPage, currentPage: currentPage.value, totalPages: totalPages.value })
   
   // Valida se a página está dentro do range válido
   if (targetPage < 1 || targetPage > totalPages.value) {
-    console.warn('Página fora do range:', { targetPage, totalPages: totalPages.value })
+    console.warn('❌ Página fora do range:', { targetPage, totalPages: totalPages.value })
     return
   }
   
   // Evita recarregar a mesma página
   if (targetPage === currentPage.value) {
+    console.log('⚠️ Já está na página:', targetPage)
     return
   }
   
-  // Carrega a página
-  loadUsers(targetPage)
+  console.log('✅ Validação passou! Carregando página:', targetPage)
+  
+  // Carrega a página (aguarda o carregamento)
+  await loadUsers(targetPage)
+  
+  console.log('✅ Página carregada. Estado atual:', {
+    currentPage: currentPage.value,
+    totalPages: totalPages.value,
+    usersCount: users.value.length
+  })
+  console.log('=== goToPage FINALIZADO ===')
   
   // Scroll para o topo da tabela após um pequeno delay
   setTimeout(() => {
@@ -535,6 +664,27 @@ function atualizarDenominacao() {
 
 
 
+// Função para mostrar popup de feedback
+function showFeedback(message, type = 'success') {
+  feedbackMessage.value = message
+  feedbackType.value = type
+  showFeedbackPopup.value = true
+  
+  // Fecha automaticamente após 3 segundos
+  setTimeout(() => {
+    if (showFeedbackPopup.value) {
+      closeFeedbackPopup()
+    }
+  }, 3000)
+}
+
+// Função para fechar popup de feedback
+function closeFeedbackPopup() {
+  showFeedbackPopup.value = false
+  feedbackMessage.value = ''
+  feedbackType.value = 'success'
+}
+
 // Função para salvar usuário (criar ou editar)
 async function saveUser() {
   isLoading.value = true
@@ -542,50 +692,75 @@ async function saveUser() {
   successMessage.value = ''
 
   try {
-    // Prepara dados para envio (remove campos vazios)
+    // Validação: se senha foi preenchida, confirmação também deve estar preenchida
+    if (formData.value.password && !formData.value.password_confirmation) {
+      errorMessage.value = 'Por favor, confirme a senha.'
+      isLoading.value = false
+      return
+    }
+
+    // Validação: senhas devem ser iguais
+    if (formData.value.password && formData.value.password !== formData.value.password_confirmation) {
+      errorMessage.value = 'As senhas não coincidem.'
+      isLoading.value = false
+      return
+    }
+
+    // Prepara dados para envio conforme o JSON fornecido
     const userData = {
-      name: formData.value.name.trim(),
       email: formData.value.email.trim(),
       nivel_acesso: formData.value.nivel_acesso,
     }
 
-    // Adiciona senha apenas se foi preenchida
-    if (formData.value.password) {
-      userData.password = formData.value.password
+    // Adiciona name apenas se existir (pode não estar no JSON fornecido, mas mantemos para compatibilidade)
+    if (formData.value.name) {
+      userData.name = formData.value.name.trim()
     }
 
-    // Adiciona confirmação de senha apenas se foi preenchida (apenas para novos usuários)
-    if (!editingUser.value && formData.value.password_confirmation) {
+    // Adiciona senha e confirmação se foram preenchidas (tanto para criar quanto para editar)
+    if (formData.value.password) {
+      userData.password = formData.value.password
       userData.password_confirmation = formData.value.password_confirmation
     }
 
-    // Adiciona divisao_id apenas se foi preenchido
-    if (formData.value.divisao_id) {
+    // Adiciona divisao_id (pode ser null)
+    if (formData.value.divisao_id !== null && formData.value.divisao_id !== '') {
       userData.divisao_id = parseInt(formData.value.divisao_id)
+    } else {
+      userData.divisao_id = null
     }
 
     let response
     if (editingUser.value) {
       // Editar usuário existente
       response = await userApi.updateUser(editingUser.value.id, userData)
-      successMessage.value = 'Usuário atualizado com sucesso!'
+      console.log('Usuário atualizado:', response.data)
+      
+      // Fecha o modal do formulário
+      closeUserForm()
+      
+      // Mostra popup de sucesso
+      showFeedback('Usuário atualizado com sucesso!', 'success')
     } else {
       // Criar novo usuário
       response = await userApi.createUser(userData)
-      successMessage.value = 'Usuário cadastrado com sucesso!'
+      console.log('Usuário criado:', response.data)
+      
+      // Fecha o modal do formulário
+      closeUserForm()
+      
+      // Mostra popup de sucesso
+      showFeedback('Usuário cadastrado com sucesso!', 'success')
     }
 
-    console.log('Usuário salvo:', response.data)
-
     await loadUsers(currentPage.value)
-
-    // Fecha modal após 2 segundos
-    setTimeout(() => {
-      closeUserForm()
-    }, 2000)
   } catch (error) {
     console.error('Erro ao salvar usuário:', error)
-    errorMessage.value = error.response?.data?.message || 'Erro ao salvar usuário. Tente novamente.'
+    const errorMsg = error.response?.data?.message || 'Erro ao salvar usuário. Tente novamente.'
+    errorMessage.value = errorMsg
+    
+    // Mostra popup de erro
+    showFeedback(errorMsg, 'error')
   } finally {
     isLoading.value = false
   }
@@ -619,16 +794,31 @@ function closeDeleteModalUser() {
 // Função para excluir usuário
 async function confirmDeleteUser() {
   if (!userToDelete.value) return 
+  
   try {
+    isLoading.value = true
+    await userApi.deleteUser(userToDelete.value.id)
     
-    await userApi.deleteUser(userToDelete.value.id) // Usa o ID salvo
-    successMessage.value = 'Usuário excluído com sucesso!'
-    closeDeleteModalUser() 
+    // Fecha o modal de confirmação
+    closeDeleteModalUser()
+    
+    // Mostra popup de sucesso
+    showFeedback('Usuário excluído com sucesso!', 'success')
+    
+    // Recarrega a lista de usuários
     await loadUsers(currentPage.value)
   } catch (error) {
     console.error('Erro ao excluir usuário:', error)
-    errorMessage.value = 'Erro ao excluir usuário. Tente novamente.'
-  } 
+    const errorMsg = error.response?.data?.message || 'Erro ao excluir usuário. Tente novamente.'
+    
+    // Fecha o modal de confirmação
+    closeDeleteModalUser()
+    
+    // Mostra popup de erro
+    showFeedback(errorMsg, 'error')
+  } finally {
+    isLoading.value = false
+  }
 }
 
 // Função para fechar modal
@@ -907,12 +1097,40 @@ function handleCji3Upload(file) {
   margin-bottom: 2rem;
 }
 
-/* Botões de ação */
+/* Botões de ação - Todos na mesma linha, tamanho original */
 .admin-buttons {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1rem;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 1.25rem;
   margin-bottom: 2rem;
+  align-items: stretch;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+}
+
+/* Scrollbar customizada para os botões */
+.admin-buttons::-webkit-scrollbar {
+  height: 6px;
+}
+
+.admin-buttons::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.admin-buttons::-webkit-scrollbar-thumb {
+  background-color: rgba(19, 44, 13, 0.3);
+  border-radius: 3px;
+}
+
+.admin-buttons::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(19, 44, 13, 0.5);
+}
+
+/* Em telas muito pequenas, permite wrap */
+@media (max-width: 768px) {
+  .admin-buttons {
+    flex-wrap: wrap;
+  }
 }
 
 .admin-btn {
@@ -930,7 +1148,12 @@ function handleCji3Upload(file) {
   gap: 0.5rem;
   justify-content: center;
   min-height: 60px;
-
+  white-space: nowrap;
+  flex-shrink: 0;
+  /* Todos os botões com o mesmo tamanho */
+  flex: 1 1 auto;
+  min-width: 180px;
+  width: 100%;
 }
 
 .admin-btn:hover {
@@ -984,18 +1207,55 @@ function handleCji3Upload(file) {
   cursor: not-allowed;
 }
 
+/* Container de Tabela - Grid System Melhorado */
 .table-container {
   overflow-x: auto;
-  overflow-y: auto;  /* <-- ADICIONADO: Permite o scroll vertical */
+  overflow-y: auto;
   max-height: 63vh;
   border-radius: 8px;
   border: 1px solid #e0e0e0;
+  /* Melhorias de scroll */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(19, 44, 13, 0.3) transparent;
 }
 
+.table-container::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.table-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.table-container::-webkit-scrollbar-thumb {
+  background-color: rgba(19, 44, 13, 0.3);
+  border-radius: 4px;
+}
+
+.table-container::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(19, 44, 13, 0.5);
+}
+
+/* Tabela de Usuários - Grid System Melhorado */
 .users-table {
   width: 100%;
   border-collapse: collapse;
   background: white;
+  /* Melhor renderização */
+  table-layout: auto;
+}
+
+/* Melhorias responsivas para tabela */
+@media (max-width: 768px) {
+  .users-table {
+    font-size: 0.8rem;
+  }
+  
+  .users-table th,
+  .users-table td {
+    padding: 0.6rem 0.5rem;
+  }
 }
 
 .users-table th {
@@ -1342,12 +1602,35 @@ padding: 0.8rem 1rem;
   background-color: #f0f0f0;
 }
 
+/* Formulário de Usuário - Grid System Melhorado */
 .user-form {
   padding: 1.5rem;
   display: grid;
-  flex-direction: column;
-  grid-template-columns: 1fr 1fr;
-  gap: 1.5rem;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.5rem 2rem;
+  align-items: start;
+}
+
+/* Breakpoints para formulário */
+@media (min-width: 1200px) {
+  .user-form {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 2rem 2.5rem;
+  }
+}
+
+@media (min-width: 900px) and (max-width: 1199px) {
+  .user-form {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem 2rem;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 899px) {
+  .user-form {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.25rem 1.5rem;
+  }
 }
 
 .form-group {
@@ -1406,6 +1689,27 @@ padding: 0.8rem 1rem;
   color: #666;
   font-size: 0.875rem;
   margin-top: 0.25rem;
+}
+
+.user-form .error-divisoes {
+  display: block;
+  margin-top: 4px;
+  color: #c62828;
+}
+
+.link-button {
+  background: none;
+  border: none;
+  color: #1565c0;
+  cursor: pointer;
+  font-size: 0.9rem;
+  padding: 0;
+  margin-left: 4px;
+}
+
+.link-button:disabled {
+  color: #999;
+  cursor: not-allowed;
 }
 
 .error-message {
@@ -1582,6 +1886,126 @@ padding: 0.8rem 1rem;
   box-shadow: 0 4px 12px rgba(139, 14, 14, 0.8);
 }
 
+/* --- Popup de Feedback --- */
+.feedback-popup-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 20px;
+  box-sizing: border-box;
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.feedback-popup-content {
+  background: white;
+  border-radius: 16px;
+  padding: 2rem;
+  max-width: 400px;
+  width: 100%;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+  text-align: center;
+  animation: slideUp 0.3s ease-out;
+  border-top: 4px solid;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.feedback-popup-content.success {
+  border-top-color: #2e7d32;
+}
+
+.feedback-popup-content.error {
+  border-top-color: #c62828;
+}
+
+.feedback-popup-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+  line-height: 1;
+}
+
+.feedback-popup-message {
+  font-size: 1.1rem;
+  color: #333;
+  margin-bottom: 1.5rem;
+  line-height: 1.5;
+  font-weight: 500;
+}
+
+.feedback-popup-close {
+  width: 100%;
+  padding: 12px 24px;
+  background-color: rgba(19, 44, 13, 0.8);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.feedback-popup-close:hover {
+  background-color: #1a3a11;
+  transform: translateY(-1px);
+}
+
+.feedback-popup-content.error .feedback-popup-close {
+  background-color: rgba(198, 40, 40, 0.8);
+}
+
+.feedback-popup-content.error .feedback-popup-close:hover {
+  background-color: rgba(198, 40, 40, 1);
+}
+
+/* Responsividade do Popup de Feedback */
+@media (max-width: 600px) {
+  .feedback-popup-content {
+    max-width: 90%;
+    padding: 1.5rem;
+  }
+
+  .feedback-popup-icon {
+    font-size: 3rem;
+  }
+
+  .feedback-popup-message {
+    font-size: 1rem;
+  }
+}
+
+/* Melhorias adicionais no Grid System */
+.admin-content {
+  /* Mantém o layout original mas com melhor espaçamento */
+  padding: 2rem;
+  max-width: 1900px;
+  margin: 0 auto;
+}
 
 /* Responsividade adicional para o Modal */
 
@@ -1595,7 +2019,8 @@ padding: 0.8rem 1rem;
 
   .user-form {
     /* Mantém as duas colunas, mas com menos espaçamento */
-    gap: 1rem;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.25rem 1.5rem;
     padding: 1rem;
   }
 

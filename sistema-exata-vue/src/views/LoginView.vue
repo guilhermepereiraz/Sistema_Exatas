@@ -36,14 +36,12 @@ function isEmailNotRegistered(error) {
   const message = error.response?.data?.message || error.message || ''
   const errorMessage = message.toLowerCase()
   
-  // Verifica se é erro 401/404 ou se a mensagem indica email não encontrado
+  // Considera "email não cadastrado" apenas para códigos/mensagens específicas
   return (
-    status === 401 || 
     status === 404 ||
     errorMessage.includes('não encontrado') ||
     errorMessage.includes('não cadastrado') ||
-    errorMessage.includes('email não existe') ||
-    errorMessage.includes('credenciais inválidas')
+    errorMessage.includes('email não existe')
   )
 }
 

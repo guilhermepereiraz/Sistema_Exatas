@@ -1,12 +1,14 @@
 <script setup>
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { authService } from '../services/auth'
 // 1. Importa a API de contratos
 import { contratoApi } from '../services/api'
 import HeaderNoHR from './Header_no_HR.vue'
+import PopupLoadView from './PopupLoadView.vue'
 
 const router = useRouter()
+const route = useRoute()
 
 // 2. Refs para a lista de contratos e estado de carregamento
 const contratos = ref([])
@@ -18,6 +20,16 @@ const currentPage = ref(1)
 const totalPages = ref(1)
 const totalContratos = ref(0)
 
+// Filtro de divisão
+const divisaoFiltro = ref(null)
+const nomeDivisao = ref('')
+
+// Upload de contrato
+const showUploadPopup = ref(false)
+const contratoSelecionado = ref(null)
+const uploadFeedback = ref({ type: '', message: '' })
+const isUploadingContrato = ref(false)
+
 // 3. Carrega dados quando o componente é montado
 onMounted(async () => {
   const user = authService.getCurrentUser()
@@ -25,16 +37,47 @@ onMounted(async () => {
     router.push('/')
     return
   }
+  
+  // Verifica se há filtro de divisão na URL
+  const divisaoId = route.query.divisao
+  if (divisaoId) {
+    divisaoFiltro.value = Number(divisaoId)
+    // TODO: Buscar nome da divisão da API se necessário
+    nomeDivisao.value = `Divisão ${divisaoId}`
+  }
+  
   // 4. Chama a função para carregar contratos
   await loadContratos(1)
 })
 
-// 5. Função para carregar CONTRATOS com paginação
+// Observa mudanças na rota para atualizar filtro
+watch(() => route.query.divisao, (newDivisao) => {
+  if (newDivisao) {
+    divisaoFiltro.value = Number(newDivisao)
+    nomeDivisao.value = `Divisão ${newDivisao}`
+    // Recarrega contratos com novo filtro
+    loadContratos(1)
+  } else {
+    divisaoFiltro.value = null
+    nomeDivisao.value = ''
+    // Recarrega contratos sem filtro
+    loadContratos(1)
+  }
+})
+
+// 5. Função para carregar CONTRATOS com paginação e filtros
 async function loadContratos(page = 1) {
   isLoadingContratos.value = true
   errorMessage.value = ''
   try {
-    const response = await contratoApi.getContratos(page, 10)
+    // Prepara filtros
+    const filters = {}
+    if (divisaoFiltro.value) {
+      filters.divisao_id = divisaoFiltro.value
+    }
+    
+    console.log('Carregando contratos com filtros:', filters)
+    const response = await contratoApi.getContratos(page, 10, filters)
 
     // Laravel Paginator response structure (ContratoCollection)
     if (response.data) {
@@ -86,12 +129,27 @@ async function loadContratos(page = 1) {
 
 // Navega para uma página específica
 function goToPage(page) {
+  console.log('goToPage chamado com:', { page, type: typeof page })
+  
   // Valida se a página é válida (não pode ser string como '...')
-  if (typeof page === 'string' || page === '...' || isNaN(page)) {
+  if (typeof page === 'string' && page !== '...' && isNaN(Number(page))) {
+    console.warn('Página inválida (string não numérica):', page)
     return
   }
   
-  const targetPage = parseInt(page, 10)
+  if (page === '...') {
+    console.warn('Tentativa de navegar para ellipsis')
+    return
+  }
+  
+  const targetPage = Number(page)
+  
+  if (isNaN(targetPage)) {
+    console.warn('Página não é um número:', page)
+    return
+  }
+  
+  console.log('Página convertida:', { targetPage, currentPage: currentPage.value, totalPages: totalPages.value })
   
   // Valida se a página está dentro do range válido
   if (targetPage < 1 || targetPage > totalPages.value) {
@@ -101,9 +159,11 @@ function goToPage(page) {
   
   // Evita recarregar a mesma página
   if (targetPage === currentPage.value) {
+    console.log('Já está na página:', targetPage)
     return
   }
   
+  console.log('Carregando página:', targetPage)
   // Carrega a página
   loadContratos(targetPage)
   
@@ -167,28 +227,63 @@ function getContratosRange() {
   return { start, end }
 }
 
-// 6. Função para formatar o Status (baseado na coluna 'concluido' 0 ou 1)
+// Função para remover filtro de divisão
+function removerFiltroDivisao() {
+  divisaoFiltro.value = null
+  nomeDivisao.value = ''
+  // Remove o query parameter da URL
+  router.push({ name: 'contrato' })
+  // loadContratos será chamado automaticamente pelo watch
+}
+
+// Abre popup de upload para um contrato específico
+function abrirUploadContrato(contrato) {
+  contratoSelecionado.value = contrato
+  uploadFeedback.value = { type: '', message: '' }
+  showUploadPopup.value = true
+}
+
+function fecharUploadPopup() {
+  showUploadPopup.value = false
+  contratoSelecionado.value = null
+}
+
+// Envia arquivo do contrato para o backend
+async function handleContratoUpload(file) {
+  if (!contratoSelecionado.value) return
+
+  isUploadingContrato.value = true
+  uploadFeedback.value = { type: '', message: '' }
+
+  try {
+    await contratoApi.uploadContrato(contratoSelecionado.value.codigo_contrato, file)
+    uploadFeedback.value = { type: 'success', message: 'Arquivo enviado com sucesso.' }
+    fecharUploadPopup()
+    // Recarrega para refletir eventual alteração
+    await loadContratos(currentPage.value)
+  } catch (error) {
+    const apiMessage = error.response?.data?.message
+    uploadFeedback.value = { 
+      type: 'error', 
+      message: apiMessage || 'Erro ao enviar arquivo. Tente novamente.' 
+    }
+  } finally {
+    isUploadingContrato.value = false
+  }
+}
+
+// 6. Função para formatar o Status (baseado na coluna 'concluido' boolean)
 function getStatusLabel(concluido) {
-  if (concluido === 1) {
+  if (concluido === true || concluido === 1) {
     return 'Concluído'
   }
-  if (concluido === 0) {
+  if (concluido === false || concluido === 0) {
     return 'Ativo'
   }
-  return concluido || '-' // Retorna o valor original ou '-'
+  return 'Ativo' // Default para false
 }
 
-// 7. Função para formatar moeda
-function formatCurrency(value) {
-  if (value === null || value === undefined) return '-'
-  const BRL = new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-  })
-  return BRL.format(value)
-}
-
-// 8. Função para formatar data (sem ajuste de fuso)
+// 7. Função para formatar data (sem ajuste de fuso)
 function formatDate(dateString) {
   if (!dateString) return '-'
   try {
@@ -216,6 +311,26 @@ function formatDate(dateString) {
 
     <main class="admin-content">
       <h2 class="h2projeto">Projetos</h2>
+
+      <div 
+        v-if="uploadFeedback.message" 
+        :class="['upload-feedback', uploadFeedback.type]"
+      >
+        <span>{{ uploadFeedback.message }}</span>
+        <button class="upload-feedback-close" @click="uploadFeedback = { type: '', message: '' }" title="Fechar alerta">
+          ✕
+        </button>
+      </div>
+      
+      <!-- Indicador de Filtro de Divisão -->
+      <div v-if="divisaoFiltro" class="filtro-divisao-badge">
+        <span class="filtro-label">Filtrando por:</span>
+        <span class="filtro-divisao-nome">{{ nomeDivisao }}</span>
+        <button @click="removerFiltroDivisao" class="btn-remover-filtro" title="Remover filtro">
+          ✕
+        </button>
+      </div>
+      
       <div class="admin-card">
         <div class="users-section">
           <!-- <div class="users-header">
@@ -241,37 +356,42 @@ function formatDate(dateString) {
             <table v-else class="users-table">
               <thead>
                 <tr>
-                  <th>Ref. Contrato</th>
-                  <th>Nº Contrato</th>
+                  <th>Código Contrato</th>
+                  <th>Referência</th>
                   <th>Descrição</th>
                   <th>Centro Custo</th>
-                  <th>Planta Global</th>
+                  <th>Divisão</th>
                   <th>Administrador</th>
                   <th>Fornecedor</th>
-                  <th>Valor Contábil</th>
                   <th>Status</th>
                   <th>Data Término</th>
+                  <th>Ações</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="contrato in contratos" :key="contrato.id">
-                  <!-- 
-                    CORREÇÃO AQUI: Trocado 'ref_contrato' por 'ref_ner' 
-                  -->
+                <tr v-for="contrato in contratos" :key="contrato.codigo_contrato">
+                  <td>{{ contrato.codigo_contrato || '-' }}</td>
                   <td>{{ contrato.referencia || '-' }}</td>
-                  <td>{{ contrato.numero || '-' }}</td>
                   <td>{{ contrato.descricao || '-' }}</td>
                   <td>{{ contrato.centro_custo || '-' }}</td>
-                  <td>{{ contrato.planta_global || '-' }}</td>
+                  <td>{{ contrato.divisao_id || '-' }}</td>
                   <td>{{ contrato.administrador || '-' }}</td>
                   <td>{{ contrato.fornecedor || '-' }}</td>
-                  <td>{{ formatCurrency(contrato.valor_contabil) }}</td>
                   <td>
                     <span class="status" :class="getStatusLabel(contrato.concluido)">
                       {{ getStatusLabel(contrato.concluido) }}
                     </span>
                   </td>
                   <td>{{ formatDate(contrato.data_termino) }}</td>
+                  <td class="acoes-col">
+                    <button 
+                      class="btn-upload-contrato" 
+                      @click="abrirUploadContrato(contrato)"
+                      :disabled="isUploadingContrato"
+                    >
+                      Atualizar contrato
+                    </button>
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -330,7 +450,40 @@ function formatDate(dateString) {
           </div>
         </div>
       </div>
+
+      <div
+        v-if="!isLoadingContratos && contratos.length > 0 && totalPages > 1"
+        class="bottom-next-container"
+      >
+        <button
+          class="bottom-next-btn"
+          @click="goToPage(currentPage + 1)"
+          :disabled="currentPage >= totalPages"
+        >
+          Próxima →
+        </button>
+      </div>
     </main>
+
+    <!-- Popup de upload de contrato -->
+    <PopupLoadView
+      v-if="showUploadPopup"
+      :title="`Upload do contrato ${contratoSelecionado ? contratoSelecionado.codigo_contrato : ''}`"
+      :accept="'.pdf,.doc,.docx,.xls,.xlsx'"
+      :allowed-extensions="['.pdf', '.doc', '.docx', '.xls', '.xlsx']"
+      :allowed-mime-types="[
+        'application/pdf',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      ]"
+      :max-size-m-b="15"
+      upload-label="📤 Enviar contrato"
+      hint-text="Formatos: PDF, DOC, DOCX, XLS, XLSX (até 15MB)"
+      @close="fecharUploadPopup"
+      @upload="handleContratoUpload"
+    />
   </div>
 </template>
 
@@ -361,6 +514,56 @@ function formatDate(dateString) {
   margin-bottom: 1rem;
   font-size: 3rem;
   text-align: center;
+}
+
+/* Badge de Filtro de Divisão */
+.filtro-divisao-badge {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  background-color: rgba(19, 44, 13, 0.1);
+  border: 2px solid rgba(19, 44, 13, 0.3);
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+  max-width: 1900px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.filtro-label {
+  font-weight: 600;
+  color: #132c0d;
+  font-size: 14px;
+}
+
+.filtro-divisao-nome {
+  flex: 1;
+  font-weight: 500;
+  color: #333;
+  font-size: 16px;
+}
+
+.btn-remover-filtro {
+  background-color: rgba(19, 44, 13, 0.8);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 16px;
+  transition: all 0.2s ease;
+  padding: 0;
+  line-height: 1;
+}
+
+.btn-remover-filtro:hover {
+  background-color: #1a3a11;
+  transform: scale(1.1);
 }
 
 .users-header {
@@ -411,7 +614,7 @@ function formatDate(dateString) {
   width: 100%;
   border-collapse: collapse;
   background: white;
-  min-width: 1600px; /* Força scroll horizontal em telas menores */
+  min-width: 1400px; /* Ajustado para os novos campos */
 }
 
 .users-table th {
@@ -611,5 +814,95 @@ function formatDate(dateString) {
 .pagination-page-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* Feedback de upload */
+.upload-feedback {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  border: 1px solid transparent;
+}
+
+.upload-feedback.success {
+  background-color: #e8f5e9;
+  border-color: #c8e6c9;
+  color: #1b5e20;
+}
+
+.upload-feedback.error {
+  background-color: #ffebee;
+  border-color: #ffcdd2;
+  color: #b71c1c;
+}
+
+.upload-feedback-close {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.acoes-col {
+  text-align: center;
+}
+
+.btn-upload-contrato {
+  background-color: rgba(19, 44, 13, 0.85);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+  min-width: 150px;
+}
+
+.btn-upload-contrato:hover {
+  background-color: #0f2410;
+  transform: translateY(-1px);
+}
+
+.btn-upload-contrato:active {
+  transform: translateY(0);
+}
+
+.bottom-next-container {
+  display: flex;
+  justify-content: center;
+  margin-top: 24px;
+  margin-bottom: 8px;
+}
+
+.bottom-next-btn {
+  background-color: rgba(19, 44, 13, 0.9);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  padding: 14px 28px;
+  font-weight: 700;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 180px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+}
+
+.bottom-next-btn:hover:not(:disabled) {
+  background-color: #0f2410;
+  transform: translateY(-2px);
+}
+
+.bottom-next-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
 }
 </style>

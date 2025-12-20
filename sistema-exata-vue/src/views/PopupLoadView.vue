@@ -28,14 +28,14 @@
           ref="fileInput"
           @change="handleFileSelect"
           style="display: none"
-          accept=".csv,.xlsx,.xls,.xlsm"
+          :accept="accept"
         />
         
         <IconLoadProcess class="icone-load-process" />
         
         <div v-if="!selectedFile" class="upload-text">
           <p>Clique aqui ou arraste o arquivo</p>
-          <p class="file-format">Formatos aceitos: .xls, .xlsx, .xlsm ou .csv</p>
+          <p class="file-format">{{ hintText }}</p>
         </div>
         
         <div v-else class="file-info">
@@ -52,7 +52,7 @@
           class="btn-upload"
         >
           <span v-if="isUploading">⏳ Processando...</span>
-          <span v-else>📤 Enviar Arquivo</span>
+          <span v-else>{{ uploadLabel }}</span>
         </button>
       </div>
     </div>
@@ -70,6 +70,35 @@ const props = defineProps({
   title: {
     type: String,
     default: 'Carregar'
+  },
+  accept: {
+    type: String,
+    default: '.csv,.xlsx,.xls,.xlsm'
+  },
+  allowedExtensions: {
+    type: Array,
+    default: () => ['.csv', '.xls', '.xlsx', '.xlsm']
+  },
+  allowedMimeTypes: {
+    type: Array,
+    default: () => [
+      'text/csv',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel.sheet.macroEnabled.12'
+    ]
+  },
+  maxSizeMB: {
+    type: Number,
+    default: 10
+  },
+  uploadLabel: {
+    type: String,
+    default: '📤 Enviar Arquivo'
+  },
+  hintText: {
+    type: String,
+    default: 'Formatos aceitos: .xls, .xlsx, .xlsm ou .csv'
   }
 })
 
@@ -104,25 +133,22 @@ function validateAndSetFile(file) {
   successMessage.value = ''
   
   // Validação de tipo
-  const allowedTypes = [
-    'text/csv',
-    'application/vnd.ms-excel',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    'application/vnd.ms-excel.sheet.macroEnabled.12'
-  ]
-  
-  const allowedExtensions = ['.csv', '.xls', '.xlsx', '.xlsm']
   const fileExtension = '.' + file.name.split('.').pop().toLowerCase()
   
-  if (!allowedExtensions.includes(fileExtension)) {
-    errorMessage.value = 'Formato de arquivo não permitido. Use CSV, XLS, XLSX ou XLSM.'
+  const normalizedAllowedExtensions = props.allowedExtensions.map(ext => ext.toLowerCase())
+  const normalizedAllowedMimeTypes = props.allowedMimeTypes.map(type => type.toLowerCase())
+  const extensionAllowed = normalizedAllowedExtensions.includes(fileExtension)
+  const mimeAllowed = file.type ? normalizedAllowedMimeTypes.includes(file.type.toLowerCase()) : true
+
+  if (!extensionAllowed && !mimeAllowed) {
+    errorMessage.value = 'Formato de arquivo não permitido.'
     return
   }
   
   // Validação de tamanho (10MB)
-  const maxSize = 10 * 1024 * 1024
+  const maxSize = props.maxSizeMB * 1024 * 1024
   if (file.size > maxSize) {
-    errorMessage.value = 'Arquivo muito grande. Tamanho máximo: 10MB.'
+    errorMessage.value = `Arquivo muito grande. Tamanho máximo: ${props.maxSizeMB}MB.`
     return
   }
   

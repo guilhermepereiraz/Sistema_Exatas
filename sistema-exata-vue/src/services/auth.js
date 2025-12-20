@@ -18,7 +18,8 @@ async login(credentials) {
       return response.data
     } catch (error) {
       console.error('Erro no login:', error)
-      throw new Error(error.response?.data?.message || 'Erro ao fazer login')
+      // Repassa o erro original para que o chamador consiga inspecionar status e payload
+      throw error
     }
   },
   // Realiza logout do usuário removendo dados do localStorage

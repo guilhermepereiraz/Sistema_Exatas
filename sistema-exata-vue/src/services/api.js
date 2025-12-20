@@ -44,7 +44,12 @@ api.interceptors.response.use(
 // Funções auxiliares para endpoints de usuários
 export const userApi = {
   // Listar todos os usuários
-  getUsers: (page = 1, limit = 10) => api.get('/users', { params: { page, limit } }),
+  getUsers: (page = 1, limit = 10) => {
+    // Adiciona timestamp para evitar cache
+    const params = { page, limit, _t: Date.now() }
+    console.log('userApi.getUsers chamado com params:', params)
+    return api.get('/users', { params })
+  },
   
   // Obter usuário por ID
   getUser: (id) => api.get(`/users/${id}`),
@@ -71,12 +76,18 @@ export const userApi = {
   },
   
   // Remover foto de perfil
-  removePhoto: (userId) => api.delete(`/users/${userId}/photo`)
+  removePhoto: (userId) => api.delete(`/users/${userId}/photo`),
+  
+  // Alterar senha (usuário logado)
+  changePassword: (passwordData) => api.post('/change-password', passwordData)
 }
 
 export const contratoApi = {
-  // Listar contratos com paginação
-  getContratos: (page = 1, limit = 10) => api.get('/contratos', { params: { page, limit } }),
+  // Listar contratos com paginação e filtros
+  getContratos: (page = 1, limit = 10, filters = {}) => {
+    const params = { page, limit, ...filters }
+    return api.get('/contratos', { params })
+  },
 
   getContrato: (id) => api.get(`/contratos/${id}`),
 
@@ -84,7 +95,20 @@ export const contratoApi = {
 
   updateContrato: (id, contratoData) => api.put(`/contratos/${id}`, contratoData),
 
-  deleteContrato: (id) => api.delete(`/contratos/${id}`)
+  deleteContrato: (id) => api.delete(`/contratos/${id}`),
+
+  // Upload de arquivo vinculado a um contrato existente
+  uploadContrato: (codigoContrato, file) => {
+    const formData = new FormData()
+    formData.append('codigo_contrato', codigoContrato)
+    formData.append('file', file)
+
+    return api.post('/contratos/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+  }
 }
 
 export const pepsApi = {
@@ -141,6 +165,25 @@ export const cadastroApi = {
       motivo
     })
   }
+}
+
+// API para divisões
+export const divisaoApi = {
+  // Listar todas as divisões
+  getDivisoes: () => api.get('/divisaos')
+}
+
+// API para reset de senha
+export const passwordResetApi = {
+  // Solicitar reset de senha (envia email com token)
+  forgotPassword: (email) => api.post('/forgot-password', { email }),
+  
+  // Verificar se o token é válido
+  verifyToken: (email, token) => api.post('/verify-token', { email, token }),
+  
+  // Resetar senha
+  resetPassword: (email, token, password, password_confirmation) => 
+    api.post('/reset-password', { email, token, password, password_confirmation })
 }
 
 export default api

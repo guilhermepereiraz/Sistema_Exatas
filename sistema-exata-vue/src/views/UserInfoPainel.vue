@@ -20,16 +20,23 @@ const isLoading = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
 
+// Feedback específico para alteração de senha
+const showPasswordFeedback = ref(false)
+const passwordFeedbackMessage = ref('')
+const passwordFeedbackType = ref('success') // 'success' | 'error'
+
 const isChangingPassword = ref(false)
 const oldPassword = ref('')
 const newPassword = ref('')
+const confirmPassword = ref('')
 
 const placeholderAvatar = '/Imagens/Carregar_foto_perfil.png'
 
 const userData = ref({
   nome: '',
   criadoEm: '',
-  divisao: 'Santana - Mirante',
+  divisaoCodigo: '',
+  divisaoNome: '',
   email: '',
   avatar: placeholderAvatar,
 })
@@ -75,7 +82,7 @@ async function loadUserData() {
     const response = await userApi.getUser(user.id)
     const userDataFromApi = response.data.data || response.data
     
-    // Preenche dados do usuário
+    // Preenche dados básicos do usuário
     userName.value = userDataFromApi.name || user.name || 'Usuário'
     userEmail.value = userDataFromApi.email || user.email || 'N/A'
     userType.value = userDataFromApi.nivel_acesso || user.nivel_acesso || 'Usuário'
@@ -101,6 +108,35 @@ async function loadUserData() {
     
     userData.value.nome = userName.value
     userData.value.email = userEmail.value
+
+    // Define divisão (código e nome) com base nos possíveis formatos de resposta
+    let divisaoCodigo = ''
+    let divisaoNome = ''
+
+    // 1) Se vier relação "divisao" no usuário
+    if (userDataFromApi.divisao) {
+      divisaoCodigo = userDataFromApi.divisao.id || userDataFromApi.divisao.codigo || ''
+      divisaoNome = userDataFromApi.divisao.nome || userDataFromApi.divisao.descricao || ''
+    }
+
+    // 2) Campos diretos no usuário (API)
+    if (!divisaoCodigo && (userDataFromApi.divisao_id || userDataFromApi.divisaoCodigo)) {
+      divisaoCodigo = userDataFromApi.divisao_id || userDataFromApi.divisaoCodigo
+    }
+    if (!divisaoNome && (userDataFromApi.divisao_nome || userDataFromApi.divisaoNome)) {
+      divisaoNome = userDataFromApi.divisao_nome || userDataFromApi.divisaoNome
+    }
+
+    // 3) Fallback: dados salvos no localStorage
+    if (!divisaoCodigo && (user.divisao_id || user.divisaoCodigo)) {
+      divisaoCodigo = user.divisao_id || user.divisaoCodigo
+    }
+    if (!divisaoNome && (user.divisao_nome || user.divisaoNome)) {
+      divisaoNome = user.divisao_nome || user.divisaoNome
+    }
+
+    userData.value.divisaoCodigo = divisaoCodigo || ''
+    userData.value.divisaoNome = divisaoNome || ''
     
   } catch (error) {
     console.error('Erro ao carregar dados do usuário:', error)
@@ -113,6 +149,10 @@ async function loadUserData() {
       userEmail.value = user.email || 'N/A'
       userData.value.nome = userName.value
       userData.value.email = userEmail.value
+
+      // Tenta também preencher divisão a partir do localStorage em caso de erro na API
+      userData.value.divisaoCodigo = user.divisao_id || user.divisaoCodigo || ''
+      userData.value.divisaoNome = user.divisao_nome || user.divisaoNome || ''
     }
   } finally {
     isLoading.value = false
@@ -129,6 +169,7 @@ function editarPerfil() {
   isEditing.value = true
   errorMessage.value = ''
   successMessage.value = ''
+  // Nota: Nome e email não podem ser editados, apenas a foto
 }
 
 async function salvarAlteracoes() {
@@ -153,21 +194,12 @@ async function salvarAlteracoes() {
       successMessage.value = 'Foto atualizada com sucesso!'
     }
     
-    // Atualiza nome e email se foram alterados
-    if (userName.value !== originalUserData.value.nome || 
-        userEmail.value !== originalUserData.value.email) {
-      await userApi.updateUser(userId.value, {
-        name: userName.value,
-        email: userEmail.value
-      })
-      successMessage.value = successMessage.value || 'Dados atualizados com sucesso!'
-    }
+    // Nome e email não podem ser editados pelo próprio usuário
+    // Apenas a foto pode ser alterada
     
     // Atualiza dados no localStorage
     const user = authService.getCurrentUser()
     if (user) {
-      user.name = userName.value
-      user.email = userEmail.value
       if (userPhotoUrl.value) {
         user.photo_url = userPhotoUrl.value
       }
@@ -196,8 +228,6 @@ async function salvarAlteracoes() {
 
 function cancelarAlteracao() {
   userData.value = JSON.parse(JSON.stringify(originalUserData.value))
-  userName.value = originalUserData.value.nome
-  userEmail.value = originalUserData.value.email
   selectedFile.value = null
   isEditing.value = false
   errorMessage.value = ''
@@ -207,6 +237,24 @@ function cancelarAlteracao() {
   if (fileInput.value) {
     fileInput.value.value = ''
   }
+  
+  // Restaura a foto original se havia uma selecionada
+  if (userPhotoUrl.value) {
+    userData.value.avatar = getPhotoUrl(userPhotoUrl.value)
+  } else {
+    userData.value.avatar = placeholderAvatar
+  }
+}
+
+// Função para obter label do nível de acesso
+function getAccessLevelLabel(nivel) {
+  const labels = {
+    admin: 'Administrador',
+    exata: 'Exata',
+    sabesp: 'SABESP',
+    usuario: 'Usuário',
+  }
+  return labels[nivel?.toLowerCase()] || nivel || 'Usuário'
 }
 
 function triggerFileInput() {
@@ -284,18 +332,132 @@ async function removePhoto() {
 
 function showPasswordFields() {
   isChangingPassword.value = true
+  oldPassword.value = ''
+  newPassword.value = ''
+  confirmPassword.value = ''
+  errorMessage.value = ''
+  successMessage.value = ''
 }
 
-function saveNewPassword() {
-  console.log('Senha Antiga:', oldPassword.value)
-  console.log('Senha Nova:', newPassword.value)
-  hidePasswordFields()
+function showPasswordFeedbackPopup(type, message) {
+  passwordFeedbackType.value = type
+  passwordFeedbackMessage.value = message
+  showPasswordFeedback.value = true
+}
+
+function closePasswordFeedbackPopup() {
+  showPasswordFeedback.value = false
+}
+
+function setPasswordError(message) {
+  errorMessage.value = message
+  showPasswordFeedbackPopup('error', message)
+}
+
+function setPasswordSuccess(message) {
+  successMessage.value = message
+  showPasswordFeedbackPopup('success', message)
+}
+
+async function saveNewPassword() {
+  try {
+    // Validações
+    if (!oldPassword.value || !oldPassword.value.trim()) {
+      setPasswordError('Por favor, informe sua senha atual.')
+      return
+    }
+    
+    if (!newPassword.value || newPassword.value.length < 8) {
+      setPasswordError('A nova senha deve ter no mínimo 8 caracteres.')
+      return
+    }
+    
+    if (newPassword.value !== confirmPassword.value) {
+      setPasswordError('As senhas não coincidem.')
+      return
+    }
+    
+    if (oldPassword.value === newPassword.value) {
+      setPasswordError('A nova senha deve ser diferente da senha atual.')
+      return
+    }
+    
+    isLoading.value = true
+    errorMessage.value = ''
+    successMessage.value = ''
+    
+    console.log('Alterando senha...')
+    
+    // Chama o endpoint de alteração de senha
+    const response = await userApi.changePassword({
+      current_password: oldPassword.value,
+      password: newPassword.value,
+      password_confirmation: confirmPassword.value
+    })
+    
+    console.log('Resposta da API:', response.data)
+    
+    // Verifica diferentes formatos de resposta
+    const isSuccess = response.data?.success === true || 
+                     response.status === 200 || 
+                     response.status === 201 ||
+                     (response.data?.message && !response.data?.errors)
+    
+    if (isSuccess) {
+      const msg = response.data?.message || 'Senha alterada com sucesso!'
+      setPasswordSuccess(msg)
+      hidePasswordFields()
+      
+      // Limpa mensagem após 5 segundos
+      setTimeout(() => {
+        successMessage.value = ''
+      }, 5000)
+    } else {
+      setPasswordError(response.data?.message || 'Erro ao alterar senha.')
+    }
+  } catch (error) {
+    console.error('Erro completo ao alterar senha:', error)
+    console.error('Response data:', error.response?.data)
+    console.error('Response status:', error.response?.status)
+    
+    // Tratamento específico para diferentes tipos de erro
+    if (error.response?.status === 422) {
+      // Erro de validação
+      const errors = error.response.data?.errors
+      if (errors?.current_password) {
+        setPasswordError(Array.isArray(errors.current_password) ? errors.current_password[0] : errors.current_password)
+      } else if (errors?.password) {
+        setPasswordError(Array.isArray(errors.password) ? errors.password[0] : errors.password)
+      } else if (errors?.password_confirmation) {
+        setPasswordError(Array.isArray(errors.password_confirmation) ? errors.password_confirmation[0] : errors.password_confirmation)
+      } else {
+        setPasswordError(error.response.data?.message || 'Dados inválidos. Verifique as informações fornecidas.')
+      }
+    } else if (error.response?.status === 401) {
+      setPasswordError('Senha atual incorreta. Verifique e tente novamente.')
+    } else if (error.response?.status === 400) {
+      setPasswordError(error.response.data?.message || 'Erro ao alterar senha. Verifique os dados informados.')
+    } else if (error.response?.status === 500) {
+      setPasswordError('Erro interno do servidor. Tente novamente mais tarde.')
+    } else {
+      setPasswordError(
+        error.response?.data?.message || 
+        error.response?.data?.error ||
+        'Erro ao alterar senha. Verifique sua conexão e tente novamente.'
+      )
+    }
+  } finally {
+    isLoading.value = false
+  }
 }
 
 function hidePasswordFields() {
   isChangingPassword.value = false
   oldPassword.value = ''
   newPassword.value = ''
+  confirmPassword.value = ''
+  errorMessage.value = ''
+  successMessage.value = ''
 }
 </script>
 
@@ -354,8 +516,7 @@ function hidePasswordFields() {
     <div class="user-details">
       <div class="detail-item item-nome">
         <h1>Nome Completo:</h1>
-        <h2 v-if="!isEditing">{{ userName }}</h2>
-        <input v-else type="text" v-model="userName" class="edit-input" />
+        <h2>{{ userName }}</h2>
       </div>
 
       <div class="detail-item item-criado">
@@ -363,9 +524,25 @@ function hidePasswordFields() {
         <h2>{{ userData.criadoEm || 'Carregando...' }}</h2>
       </div>
 
+      <div class="detail-item item-nivel-acesso">
+        <h1>Nível de Acesso:</h1>
+        <h2>
+          <span class="access-level-badge" :class="userType.toLowerCase()">
+            {{ getAccessLevelLabel(userType) }}
+          </span>
+        </h2>
+      </div>
+
       <div class="detail-item item-divisao">
         <h1>Divisão:</h1>
-        <h2>Santana - Mirante</h2>
+        <h2 v-if="userData.divisaoCodigo || userData.divisaoNome">
+          <span v-if="userData.divisaoCodigo">Código: {{ userData.divisaoCodigo }}</span>
+          <span v-if="userData.divisaoCodigo && userData.divisaoNome"> - </span>
+          <span v-if="userData.divisaoNome">{{ userData.divisaoNome }}</span>
+        </h2>
+        <h2 v-else>
+          Não informado
+        </h2>
       </div>
 
       <div class="detail-item item-avatar">
@@ -392,33 +569,95 @@ function hidePasswordFields() {
 
       <div class="detail-item item-email">
         <h1>E-mail:</h1>
-        <h2 v-if="!isEditing">{{ userEmail }}</h2>
-        <input v-else type="text" v-model="userEmail" class="edit-input" />
+        <h2>{{ userEmail }}</h2>
       </div>
 
       <div class="detail-item item-senha">
         <h1>Senha:</h1>
-
-        <button v-if="!isChangingPassword" @click="showPasswordFields" class="alt_bnt">
+        <h2>••••••••</h2>
+        <button v-if="!isChangingPassword" @click="showPasswordFields" class="alt_bnt" :disabled="isLoading">
           Alterar Senha
         </button>
+      </div>
+    </div>
+  </div>
 
-        <div v-if="isChangingPassword" class="password-change-form">
+  <!-- Modal de alteração de senha -->
+  <div
+    v-if="isChangingPassword"
+    class="password-modal-overlay"
+    @click.self="hidePasswordFields"
+  >
+    <div class="password-modal">
+      <div class="password-modal-header">
+        <h2>Alterar Senha</h2>
+        <button class="password-modal-close" @click="hidePasswordFields" :disabled="isLoading">
+          &times;
+        </button>
+      </div>
+
+      <div class="password-modal-body">
+        <p class="password-modal-description">
+          Informe sua senha atual e defina uma nova senha para acessar o sistema.
+        </p>
+
+        <div class="password-change-form">
           <input
             type="password"
             v-model="oldPassword"
             class="edit-password"
-            placeholder="Informe a senha antiga"
+            placeholder="Senha atual"
+            :disabled="isLoading"
+            autocomplete="current-password"
           />
           <input
             type="password"
             v-model="newPassword"
             class="edit-password"
-            placeholder="Informe a nova senha"
+            placeholder="Nova senha (mín. 8 caracteres)"
+            :disabled="isLoading"
+            autocomplete="new-password"
           />
-          <button class="bntsalvar" @click="saveNewPassword">Salvar</button>
+          <input
+            type="password"
+            v-model="confirmPassword"
+            class="edit-password"
+            placeholder="Confirmar nova senha"
+            :disabled="isLoading"
+            autocomplete="new-password"
+          />
+        </div>
+
+        <div class="password-modal-actions">
+          <button class="btn-cancelar-senha" @click="hidePasswordFields" :disabled="isLoading">
+            Cancelar
+          </button>
+          <button class="bntsalvar" @click="saveNewPassword" :disabled="isLoading">
+            <span v-if="isLoading">Salvando...</span>
+            <span v-else>Salvar</span>
+          </button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- Pop-up de feedback da alteração de senha -->
+  <div
+    v-if="showPasswordFeedback"
+    class="feedback-popup-overlay"
+    @click.self="closePasswordFeedbackPopup"
+  >
+    <div class="feedback-popup-content" :class="passwordFeedbackType" @click.stop>
+      <div class="feedback-popup-icon">
+        <span v-if="passwordFeedbackType === 'success'">✅</span>
+        <span v-else>❌</span>
+      </div>
+      <div class="feedback-popup-message">
+        {{ passwordFeedbackMessage }}
+      </div>
+      <button class="feedback-popup-close" @click="closePasswordFeedbackPopup">
+        OK
+      </button>
     </div>
   </div>
 </template>
@@ -496,16 +735,44 @@ img {
   box-shadow: 0 4px 12px rgba(19, 44, 13, 0.3);
 }
 
+/* Grid System Melhorado para User Details */
 .user-details {
   padding: 60px 55px;
   display: grid;
-  grid-template-columns: minmax(300px, 2fr) minmax(180px, 1fr);
+  grid-template-columns: minmax(300px, 2fr) minmax(200px, 1fr);
   grid-template-areas:
-    'nome    criado'
-    'divisao avatar'
-    'email   avatar'
-    'senha   avatar';
-  gap: 2.5rem 30rem;
+    'nome         criado'
+    'nivel-acesso avatar'
+    'divisao      avatar'
+    'email        avatar'
+    'senha        avatar';
+  gap: 2.5rem 3rem;
+  align-items: start;
+}
+
+/* Breakpoints refinados para User Details */
+@media (min-width: 1400px) {
+  .user-details {
+    grid-template-columns: minmax(350px, 2fr) minmax(220px, 1fr);
+    gap: 3rem 4rem;
+    padding: 60px 70px;
+  }
+}
+
+@media (min-width: 1200px) and (max-width: 1399px) {
+  .user-details {
+    grid-template-columns: minmax(320px, 2fr) minmax(200px, 1fr);
+    gap: 2.5rem 3rem;
+    padding: 50px 55px;
+  }
+}
+
+@media (min-width: 993px) and (max-width: 1199px) {
+  .user-details {
+    grid-template-columns: minmax(280px, 2fr) minmax(180px, 1fr);
+    gap: 2rem 2.5rem;
+    padding: 45px 50px;
+  }
 }
 
 .item-nome {
@@ -513,6 +780,9 @@ img {
 }
 .item-criado {
   grid-area: criado;
+}
+.item-nivel-acesso {
+  grid-area: nivel-acesso;
 }
 .item-divisao {
   grid-area: divisao;
@@ -540,6 +810,36 @@ img {
   font-size: 21px;
   color: #000000;
   word-break: break;
+}
+
+/* Badge de Nível de Acesso */
+.access-level-badge {
+  display: inline-block;
+  padding: 0.4rem 1rem;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.access-level-badge.admin {
+  background-color: #ffebee;
+  color: #c62828;
+}
+
+.access-level-badge.exata {
+  background-color: #fff3e0;
+  color: #ef6c00;
+}
+
+.access-level-badge.sabesp {
+  background-color: #e3f2fd;
+  color: #1565c0;
+}
+
+.access-level-badge.usuario {
+  background-color: #e8f5e8;
+  color: #2e7d32;
 }
 
 .password-btn {
@@ -673,20 +973,130 @@ img {
 
 .password-change-form {
   display: flex;
-  flex-wrap: wrap; 
-  align-items: center;
-  gap: 5px; /* <-- ADICIONE ESTA LINHA */
+  flex-direction: column;
+  gap: 12px;
 }
 
 .edit-password {
-  width: 40%;
+  width: 100%;
   font-size: 15px;
-  padding: 12px 12px 12px 20px;
+  padding: 12px;
   border: 1px solid #ccc;
   border-radius: 4px;
   background-color: #fff;
   color: #333;
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.edit-password:focus {
+  outline: none;
+  border-color: rgba(19, 44, 13, 0.8);
+  box-shadow: 0 0 5px rgba(19, 44, 13, 0.5);
+}
+
+.password-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+/* Modal de alteração de senha */
+.password-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.password-modal {
+  background: white;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 480px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  animation: slideIn 0.25s ease-out;
+}
+
+.password-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.password-modal-header h2 {
+  margin: 0;
+  font-size: 1.4rem;
+  color: #132c0d;
+}
+
+.password-modal-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #666;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.password-modal-close:hover:not(:disabled) {
+  background-color: #f0f0f0;
+  color: #333;
+}
+
+.password-modal-body {
+  padding: 20px;
+}
+
+.password-modal-description {
+  font-size: 14px;
+  color: #555;
+  margin-bottom: 16px;
+}
+
+.password-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.btn-cancelar-senha {
+  padding: 8px 25px;
+  background-color: rgba(139, 14, 14, 0.8);
+  color: white;
+  border: 1px solid black;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.btn-cancelar-senha:hover:not(:disabled) {
+  background-color: rgba(163, 8, 8, 0.8);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(139, 14, 14, 0.3);
+}
+
+.btn-cancelar-senha:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 
@@ -705,6 +1115,70 @@ img {
   background-color: #0f2410;
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(19, 44, 13, 0.3);
+}
+
+/* Pop-up de feedback da alteração de senha */
+.feedback-popup-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.feedback-popup-content {
+  background: #fff;
+  border-radius: 14px;
+  padding: 20px 24px;
+  max-width: 380px;
+  width: 100%;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+}
+
+.feedback-popup-content.success {
+  border-left: 6px solid #2e7d32;
+}
+
+.feedback-popup-content.error {
+  border-left: 6px solid #c62828;
+}
+
+.feedback-popup-icon {
+  font-size: 32px;
+}
+
+.feedback-popup-message {
+  font-size: 15px;
+  color: #333;
+}
+
+.feedback-popup-close {
+  margin-top: 8px;
+  padding: 8px 24px;
+  border-radius: 8px;
+  border: none;
+  background-color: rgba(19, 44, 13, 0.9);
+  color: #fff;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.feedback-popup-close:hover {
+  background-color: #0f2410;
+  transform: translateY(-1px);
 }
 
 /* Mensagens de feedback */
@@ -820,13 +1294,21 @@ img {
   transform: none;
 }
 
-@media (max-width: 992px) {
+/* Breakpoint Tablet - Grid System Melhorado */
+@media (min-width: 769px) and (max-width: 992px) {
   .info-container {
     width: 90%;
   }
   .user-details {
-    gap: 2rem 2.5rem;
-    padding: 40px 30px;
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas:
+      'nome         criado'
+      'nivel-acesso avatar'
+      'divisao      avatar'
+      'email        email'
+      'senha        senha';
+    gap: 2rem 2rem;
+    padding: 40px 35px;
   }
   .avatar {
     max-width: 120px;
@@ -862,6 +1344,7 @@ img {
       'avatar'
       'nome'
       'email'
+      'nivel-acesso'
       'criado'
       'divisao'
       'senha';
