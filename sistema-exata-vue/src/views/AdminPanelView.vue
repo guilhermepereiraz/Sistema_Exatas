@@ -1,31 +1,29 @@
-
 <template>
   <div class="admin-panel">
+    <HeaderNoHR />
 
-  <HeaderNoHR />
+    <div class="confirmation-backdrop" v-if="isDeleteUser" @click="closeDeleteModalUser">
+      <div class="confirmation-window">
+        <div class="confirmation-heading">
+          <h1>Tem certeza que deseja<br />excluir o usuário?</h1>
+        </div>
 
-<div class="confirmation-backdrop" v-if="isDeleteUser">
-  <div class="confirmation-window">
-    
-    <div class="confirmation-heading">
-      <h1>Tem certeza que deseja<br>excluir o usuário?</h1>
+        <div>
+          <span class="target-user-display"
+            >({{ userToDelete ? userToDelete.name : 'usuário' }})</span
+          >
+        </div>
+
+        <div class="confirmation-text">
+          <p>O usuário <strong>SERÁ</strong> excluído do banco de dados.</p>
+        </div>
+
+        <div class="confirmation-actions">
+          <button class="action-button action-cancel" @click="closeDeleteModalUser">Não</button>
+          <button class="action-button action-confirm" @click="confirmDeleteUser">Sim</button>
+        </div>
+      </div>
     </div>
-
-    <div>
-       <span class="target-user-display">({{ userToDelete ? userToDelete.name : 'usuário'}})</span>
-    </div>
-
-    <div class="confirmation-text">
-      <p>O usuário <strong>SERÁ</strong> excluído do banco de dados.</p>
-    </div>
-
-    <div class="confirmation-actions">
-      <button class="action-button action-cancel" @click="closeDeleteModalUser">Não</button>
-      <button class="action-button action-confirm" @click="confirmDeleteUser">Sim</button>
-    </div>
-
-  </div>
-</div>
 
     <main class="admin-content">
       <div class="admin-card">
@@ -34,19 +32,19 @@
 
         <!-- Botões de ação -->
         <div class="admin-buttons">
-          <button @click="atualizarPEPS" class="admin-btn">
-            <span class="btn-icon"></span>
-            Atualizar PEPS
-          </button>
-          <button @click="atualizarContratos" class="admin-btn">
+            <button @click="atualizarContratos" class="admin-btn">
             <span class="btn-icon"></span>
             Atualizar Contratos
           </button>
-          <button @click="atualizarMedicao" class="admin-btn">
+          <button @click="atualizarCJI3" class="admin-btn">
             <span class="btn-icon"></span>
-            Atualizar Medição
+            Atualizar CJI3
           </button>
-            <button @click="atualizarDenominacao" class="admin-btn">
+          <button @click="atualizarCadastro" class="admin-btn">
+            <span class="btn-icon"></span>
+            Atualizar Cadastro
+          </button>
+          <button @click="atualizarDenominacao" class="admin-btn">
             <span class="btn-icon"></span>
             Arquivos Denominação
           </button>
@@ -58,9 +56,7 @@
 
         <!-- Tabela de usuários -->
         <div class="users-section">
-          <div class="users-header">
-            <h3>Usuários Cadastrados no Sistema</h3>
-          </div>
+          <div class="users-header"></div>
           <div class="table-container">
             <div v-if="isLoadingUsers" class="loading-users">
               <div class="loading-spinner"></div>
@@ -69,11 +65,12 @@
             <table v-else class="users-table">
               <thead>
                 <tr>
-                  <th>Nome Completo</th>
-                  <th>Email</th>
-                  <th>Nível de Acesso</th>
-                  <th>Divisão</th>
-                  <th>Ações</th>
+                  <th style="text-align: center;">Nome Completo</th>
+                  <th style="text-align: center;">Email</th>
+                  <th style="text-align: center;">Nível de Acesso</th>
+                  <th style="text-align: center;">Divisão</th>
+                  <th style="text-align: center;">Editar</th>
+                  <th style="text-align: center;">Excluir</th>
                 </tr>
               </thead>
               <tbody>
@@ -88,54 +85,63 @@
                   <td>{{ user.divisao_id || '-' }}</td>
                   <td class="actions">
                     <button @click="editUser(user)" class="action-btn edit-btn" title="Editar">
-                      ✏️
+                      <IconEdit />
                     </button>
-                    <button @click="promptDeleteUser(user)" class="action-btn delete-btn" title="Excluir">
-                      🗑️
+                  </td>
+                  <td>
+                    <button
+                      @click="promptDeleteUser(user)"
+                      class="action-btn delete-btn"
+                      title="Excluir"
+                    >
+                      <IconDelete />
                     </button>
                   </td>
                 </tr>
               </tbody>
             </table>
-            
+
             <!-- Controles de Paginação -->
             <div v-if="!isLoadingUsers && users.length > 0" class="pagination-container">
               <div class="pagination-info">
                 <span>
-                  Mostrando {{ getUsersRange().start }} a {{ getUsersRange().end }} 
-                  de {{ totalUsers }} usuário{{ totalUsers !== 1 ? 's' : '' }}
+                  Mostrando {{ getUsersRange().start }} a {{ getUsersRange().end }} de
+                  {{ totalUsers }} usuário{{ totalUsers !== 1 ? 's' : '' }}
                 </span>
                 <!-- Debug info (remover depois) -->
-                <div style="font-size: 0.75rem; color: #999; margin-top: 0.25rem;">
-                  Página {{ currentPage }} de {{ totalPages }} | 
-                  Botão desabilitado: {{ currentPage >= totalPages || isLoadingUsers ? 'Sim' : 'Não' }}
+                <div style="font-size: 0.75rem; color: #999; margin-top: 0.25rem">
+                  Página {{ currentPage }} de {{ totalPages }} | Botão desabilitado:
+                  {{ currentPage >= totalPages || isLoadingUsers ? 'Sim' : 'Não' }}
                 </div>
               </div>
-              
+
               <div class="pagination-controls">
-                <button 
-                  @click="goToPage(currentPage - 1)" 
+                <button
+                  @click="goToPage(currentPage - 1)"
                   :disabled="currentPage === 1 || isLoadingUsers"
                   class="pagination-btn"
                   title="Página anterior"
                 >
                   ← Anterior
                 </button>
-                
+
                 <div class="pagination-pages">
                   <button
                     v-for="page in getPageNumbers()"
                     :key="page"
                     @click="goToPage(page)"
                     :disabled="isLoadingUsers"
-                    :class="['pagination-page-btn', { 'active': page === currentPage, 'ellipsis': page === '...' }]"
+                    :class="[
+                      'pagination-page-btn',
+                      { active: page === currentPage, ellipsis: page === '...' },
+                    ]"
                   >
                     {{ page }}
                   </button>
                 </div>
-                
-                <button 
-                  @click="goToPage(currentPage + 1)" 
+
+                <button
+                  @click="goToPage(currentPage + 1)"
                   :disabled="currentPage >= totalPages || isLoadingUsers"
                   class="pagination-btn"
                   :title="`Próxima página (${currentPage + 1} de ${totalPages})`"
@@ -144,7 +150,7 @@
                 </button>
               </div>
             </div>
-            
+
             <div v-if="!isLoadingUsers && users.length === 0" class="no-users">
               <div class="no-users-content">
                 <h4>Nenhum usuário cadastrado</h4>
@@ -170,24 +176,29 @@
       </div>
     </main>
 
-      <PopupLoadView 
-      v-if="showDenominacaoPopup" 
+    <PopupLoadView
+      v-if="showDenominacaoPopup"
       title="Carregar Denominação"
-      @close="showDenominacaoPopup = false" 
+      @close="showDenominacaoPopup = false"
     />
 
-    <PopupLoadView v-if="showCadastroQauntPopup"
-    title="Carregar Quantitativo Cadastro" @close="showCadastroQauntPopup = false"/>
+    <PopupLoadView
+      v-if="showCadastroQauntPopup"
+      title="Carregar Quantitativo Cadastro"
+      @close="showCadastroQauntPopup = false"
+    />
 
-    <PopupLoadView v-if="showContratosPopup"
-    title="Carregar Contratos" @close="showContratosPopup = false"/>
+    <PopupLoadView
+      v-if="showContratosPopup"
+      title="Carregar Contratos"
+      @close="showContratosPopup = false"
+    />
 
-    <PopupLoadView v-if="showCji3Popup" 
-    title="Carregar CJI3" @close="showCji3Popup = false"/>
+    <PopupLoadView v-if="showCji3Popup" title="Carregar CJI3" @close="showCji3Popup = false" />
 
-    <PopupLoadView 
-      v-if="showPepsPopup" 
-      title="Carregar PEPS" 
+    <PopupLoadView
+      v-if="showPepsPopup"
+      title="Carregar CJI3"
       @close="showPepsPopup = false"
       @upload="handlePepsUpload"
     />
@@ -202,9 +213,7 @@
         <div class="feedback-popup-message">
           {{ feedbackMessage }}
         </div>
-        <button @click="closeFeedbackPopup" class="feedback-popup-close">
-          OK
-        </button>
+        <button @click="closeFeedbackPopup" class="feedback-popup-close">OK</button>
       </div>
     </div>
 
@@ -214,14 +223,20 @@
         <div class="modal-header">
           <h3>{{ editingUser ? 'Informações do Usuário' : 'Informações do Novo Usuário' }}</h3>
           <button @click="closeUserForm" class="close-btn">&times;</button>
-    
         </div>
         <hr class="modal-hr" />
 
         <form @submit.prevent="saveUser" class="user-form">
           <div class="form-group">
             <label for="name">Nome Completo:</label>
-            <input type="text" id="name" v-model="formData.name" required :disabled="isLoading" placeholder="Nome do Colaborador" />
+            <input
+              type="text"
+              id="name"
+              v-model="formData.name"
+              required
+              :disabled="isLoading"
+              placeholder="Nome do Colaborador"
+            />
           </div>
 
           <div class="form-group">
@@ -246,9 +261,8 @@
               :disabled="isLoading"
               placeholder="Mínimo de 8 caracteres, com letras e números."
             />
-            <small v-if="editingUser" class="form-help"
-              >Deixe em branco para manter a senha atual</small
-            >
+            <!-- <small v-if="editingUser" class="form-help">
+              Deixe em branco para manter a senha atual</small> -->
           </div>
 
           <div class="form-group">
@@ -265,7 +279,7 @@
               >Confirme a nova senha</small
             >
           </div>
-              <div class="form-group">
+          <div class="form-group">
             <label for="nivel_acesso">Nível de Acesso:</label>
             <select
               id="nivel_acesso"
@@ -290,21 +304,26 @@
               :disabled="isLoading || isLoadingDivisoes || divisoes.length === 0"
             >
               <option :value="null" selected>
-                {{ isLoadingDivisoes ? 'Carregando divisões...' : 'Selecione uma divisão (opcional)' }}
+                {{
+                  isLoadingDivisoes ? 'Carregando divisões...' : 'Selecione uma divisão (opcional)'
+                }}
               </option>
-              <option
-                v-for="divisao in divisoes"
-                :key="divisao.id"
-                :value="divisao.id"
-              >
+              <option v-for="divisao in divisoes" :key="divisao.id" :value="divisao.id">
                 ID: {{ divisao.id }} - {{ divisao.nome }}
               </option>
             </select>
             <small v-if="errorDivisoes" class="form-help error-divisoes">
-              {{ errorDivisoes }} <button type="button" class="link-button" @click="loadDivisoes" :disabled="isLoadingDivisoes">Tentar novamente</button>
+              {{ errorDivisoes }}
+              <button
+                type="button"
+                class="link-button"
+                @click="loadDivisoes"
+                :disabled="isLoadingDivisoes"
+              >
+                Tentar novamente
+              </button>
             </small>
           </div>
-
 
           <!-- Mensagem de erro -->
           <div v-if="errorMessage" class="error-message">
@@ -317,7 +336,7 @@
           </div>
 
           <div class="form-actions">
-                        <button type="submit" class="submit-btn" :disabled="isLoading">
+            <button type="submit" class="submit-btn" :disabled="isLoading">
               <span v-if="isLoading">{{ editingUser ? 'Salvando...' : 'Cadastrando...' }}</span>
               <span v-else>{{ editingUser ? 'Salvar' : 'Cadastrar' }}</span>
             </button>
@@ -337,7 +356,9 @@ import { useRouter } from 'vue-router'
 import { authService } from '../services/auth'
 import { userApi, pepsApi, divisaoApi } from '../services/api'
 import HeaderNoHR from './Header_no_HR.vue'
-import PopupLoadView  from './PopupLoadView.vue'
+import PopupLoadView from './PopupLoadView.vue'
+import IconDelete from '@/components/icons/IconDelete.vue'
+import IconEdit from '@/components/icons/IconEdit.vue'
 
 const router = useRouter()
 
@@ -349,16 +370,15 @@ const currentPage = ref(1)
 const totalPages = ref(1)
 const totalUsers = ref(0)
 
-
 // Estados do modal e formulário
 const showUserForm = ref(false)
 const editingUser = ref(null)
 
-const showDenominacaoPopup = ref(false);
-const showCadastroQauntPopup = ref(false);
-const showContratosPopup = ref(false);
-const showCji3Popup = ref(false);
-const showPepsPopup = ref(false);
+const showDenominacaoPopup = ref(false)
+const showCadastroQauntPopup = ref(false)
+const showContratosPopup = ref(false)
+const showCji3Popup = ref(false)
+const showPepsPopup = ref(false)
 
 // Dados do formulário de cadastro
 const formData = ref({
@@ -388,8 +408,6 @@ const userToDelete = ref(null)
 const showFeedbackPopup = ref(false)
 const feedbackMessage = ref('')
 const feedbackType = ref('success') // 'success' ou 'error'
-
-
 
 // Carrega dados do usuário quando o componente é montado
 onMounted(async () => {
@@ -439,19 +457,19 @@ async function loadDivisoes() {
 async function loadUsers(page = 1) {
   isLoadingUsers.value = true
   errorMessage.value = ''
-  
+
   console.log('=== loadUsers INICIADO ===')
   console.log('Página solicitada:', page)
   console.log('Estado atual:', {
     currentPage: currentPage.value,
     totalPages: totalPages.value,
-    totalUsers: totalUsers.value
+    totalUsers: totalUsers.value,
   })
-  
+
   try {
     console.log('Fazendo requisição para API com page:', page, 'limit: 10')
     const response = await userApi.getUsers(page, 10)
-    
+
     console.log('=== RESPOSTA DA API ===')
     console.log('Response completo:', response)
     console.log('Response.data:', response.data)
@@ -466,22 +484,22 @@ async function loadUsers(page = 1) {
         console.log('✅ Estrutura Laravel Resource Collection detectada')
         console.log('Dados recebidos:', response.data.data.length, 'usuários')
         console.log('Meta completa:', JSON.stringify(response.data.meta, null, 2))
-        
+
         // Força atualização reativa
         users.value = [...response.data.data]
-        
+
         // Garante que os valores são números
         const meta = response.data.meta
         currentPage.value = Number(meta.current_page) || Number(page)
         totalPages.value = Number(meta.last_page) || Math.ceil((Number(meta.total) || 0) / 10) || 1
         totalUsers.value = Number(meta.total) || 0
-        
+
         // Validação adicional: se totalPages não foi calculado corretamente, calcula manualmente
         if (totalPages.value === 1 && totalUsers.value > 10) {
           totalPages.value = Math.ceil(totalUsers.value / 10)
           console.warn('⚠️ totalPages recalculado manualmente:', totalPages.value)
         }
-        
+
         console.log('✅ Paginação atualizada:', {
           currentPage: currentPage.value,
           totalPages: totalPages.value,
@@ -489,9 +507,9 @@ async function loadUsers(page = 1) {
           usersCount: users.value.length,
           primeiroUsuario: users.value[0]?.email || 'N/A',
           ultimoUsuario: users.value[users.value.length - 1]?.email || 'N/A',
-          botaoProximoDesabilitado: currentPage.value >= totalPages.value
+          botaoProximoDesabilitado: currentPage.value >= totalPages.value,
         })
-      } 
+      }
       // Fallback: se data é um array direto (sem paginação)
       else if (Array.isArray(response.data)) {
         console.log('⚠️ Resposta sem paginação (array direto)')
@@ -499,7 +517,7 @@ async function loadUsers(page = 1) {
         totalPages.value = 1
         currentPage.value = 1
         totalUsers.value = response.data.length
-      } 
+      }
       // Fallback: estrutura alternativa
       else if (response.data.users && Array.isArray(response.data.users)) {
         console.log('⚠️ Estrutura alternativa detectada')
@@ -507,8 +525,7 @@ async function loadUsers(page = 1) {
         currentPage.value = Number(response.data.current_page) || Number(page)
         totalPages.value = Number(response.data.last_page) || 1
         totalUsers.value = Number(response.data.total) || response.data.users.length
-      } 
-      else {
+      } else {
         console.warn('❌ Formato de resposta inesperado:', response.data)
         console.warn('Chaves do objeto:', Object.keys(response.data))
         users.value = []
@@ -529,10 +546,11 @@ async function loadUsers(page = 1) {
       message: error.message,
       response: error.response?.data,
       status: error.response?.status,
-      config: error.config
+      config: error.config,
     })
     errorMessage.value =
-      'Erro ao carregar lista de usuários: ' + (error.response?.data?.message || error.message || 'Erro desconhecido')
+      'Erro ao carregar lista de usuários: ' +
+      (error.response?.data?.message || error.message || 'Erro desconhecido')
     users.value = []
     totalPages.value = 1
     currentPage.value = 1
@@ -547,51 +565,55 @@ async function loadUsers(page = 1) {
 async function goToPage(page) {
   console.log('=== goToPage INICIADO ===')
   console.log('goToPage chamado com:', { page, type: typeof page })
-  
+
   // Valida se a página é válida (não pode ser string como '...')
   if (typeof page === 'string' && page !== '...' && isNaN(Number(page))) {
     console.warn('❌ Página inválida (string não numérica):', page)
     return
   }
-  
+
   if (page === '...') {
     console.warn('❌ Tentativa de navegar para ellipsis')
     return
   }
-  
+
   const targetPage = Number(page)
-  
+
   if (isNaN(targetPage)) {
     console.warn('❌ Página não é um número:', page)
     return
   }
-  
-  console.log('Página convertida:', { targetPage, currentPage: currentPage.value, totalPages: totalPages.value })
-  
+
+  console.log('Página convertida:', {
+    targetPage,
+    currentPage: currentPage.value,
+    totalPages: totalPages.value,
+  })
+
   // Valida se a página está dentro do range válido
   if (targetPage < 1 || targetPage > totalPages.value) {
     console.warn('❌ Página fora do range:', { targetPage, totalPages: totalPages.value })
     return
   }
-  
+
   // Evita recarregar a mesma página
   if (targetPage === currentPage.value) {
     console.log('⚠️ Já está na página:', targetPage)
     return
   }
-  
+
   console.log('✅ Validação passou! Carregando página:', targetPage)
-  
+
   // Carrega a página (aguarda o carregamento)
   await loadUsers(targetPage)
-  
+
   console.log('✅ Página carregada. Estado atual:', {
     currentPage: currentPage.value,
     totalPages: totalPages.value,
-    usersCount: users.value.length
+    usersCount: users.value.length,
   })
   console.log('=== goToPage FINALIZADO ===')
-  
+
   // Scroll para o topo da tabela após um pequeno delay
   setTimeout(() => {
     const tableContainer = document.querySelector('.table-container')
@@ -608,7 +630,7 @@ function getPageNumbers() {
   const pages = []
   const total = totalPages.value
   const current = currentPage.value
-  
+
   if (total <= 7) {
     // Se há 7 ou menos páginas, mostra todas
     for (let i = 1; i <= total; i++) {
@@ -617,7 +639,7 @@ function getPageNumbers() {
   } else {
     // Sempre mostra primeira página
     pages.push(1)
-    
+
     if (current <= 3) {
       // Perto do início
       for (let i = 2; i <= 4; i++) {
@@ -641,35 +663,33 @@ function getPageNumbers() {
       pages.push(total)
     }
   }
-  
+
   return pages
 }
 
 // Funções dos botões de ação
-function atualizarPEPS() {
-  showPepsPopup.value = true;
+function atualizarCJI3() {
+  showPepsPopup.value = true
 }
 
 function atualizarContratos() {
-  showContratosPopup.value = true;
+  showContratosPopup.value = true
 }
 
-function atualizarMedicao() {
-  showCadastroQauntPopup.value = true;
+function atualizarCadastro() {
+  showCadastroQauntPopup.value = true
 }
 
 function atualizarDenominacao() {
-  showDenominacaoPopup.value = true;
+  showDenominacaoPopup.value = true
 }
-
-
 
 // Função para mostrar popup de feedback
 function showFeedback(message, type = 'success') {
   feedbackMessage.value = message
   feedbackType.value = type
   showFeedbackPopup.value = true
-  
+
   // Fecha automaticamente após 3 segundos
   setTimeout(() => {
     if (showFeedbackPopup.value) {
@@ -700,7 +720,10 @@ async function saveUser() {
     }
 
     // Validação: senhas devem ser iguais
-    if (formData.value.password && formData.value.password !== formData.value.password_confirmation) {
+    if (
+      formData.value.password &&
+      formData.value.password !== formData.value.password_confirmation
+    ) {
       errorMessage.value = 'As senhas não coincidem.'
       isLoading.value = false
       return
@@ -735,20 +758,20 @@ async function saveUser() {
       // Editar usuário existente
       response = await userApi.updateUser(editingUser.value.id, userData)
       console.log('Usuário atualizado:', response.data)
-      
+
       // Fecha o modal do formulário
       closeUserForm()
-      
+
       // Mostra popup de sucesso
       showFeedback('Usuário atualizado com sucesso!', 'success')
     } else {
       // Criar novo usuário
       response = await userApi.createUser(userData)
       console.log('Usuário criado:', response.data)
-      
+
       // Fecha o modal do formulário
       closeUserForm()
-      
+
       // Mostra popup de sucesso
       showFeedback('Usuário cadastrado com sucesso!', 'success')
     }
@@ -758,7 +781,7 @@ async function saveUser() {
     console.error('Erro ao salvar usuário:', error)
     const errorMsg = error.response?.data?.message || 'Erro ao salvar usuário. Tente novamente.'
     errorMessage.value = errorMsg
-    
+
     // Mostra popup de erro
     showFeedback(errorMsg, 'error')
   } finally {
@@ -790,30 +813,29 @@ function closeDeleteModalUser() {
   userToDelete.value = null
 }
 
-
 // Função para excluir usuário
 async function confirmDeleteUser() {
-  if (!userToDelete.value) return 
-  
+  if (!userToDelete.value) return
+
   try {
     isLoading.value = true
     await userApi.deleteUser(userToDelete.value.id)
-    
+
     // Fecha o modal de confirmação
     closeDeleteModalUser()
-    
+
     // Mostra popup de sucesso
     showFeedback('Usuário excluído com sucesso!', 'success')
-    
+
     // Recarrega a lista de usuários
     await loadUsers(currentPage.value)
   } catch (error) {
     console.error('Erro ao excluir usuário:', error)
     const errorMsg = error.response?.data?.message || 'Erro ao excluir usuário. Tente novamente.'
-    
+
     // Fecha o modal de confirmação
     closeDeleteModalUser()
-    
+
     // Mostra popup de erro
     showFeedback(errorMsg, 'error')
   } finally {
@@ -975,7 +997,7 @@ function getAccessLevelLabel(nivel) {
 
 // Função helper para calcular range de usuários exibidos
 function getUsersRange() {
-  const start = ((currentPage.value - 1) * 10) + 1
+  const start = (currentPage.value - 1) * 10 + 1
   const end = Math.min(currentPage.value * 10, totalUsers.value)
   return { start, end }
 }
@@ -988,7 +1010,7 @@ async function handlePepsUpload(file) {
     successMessage.value = ''
 
     const response = await pepsApi.uploadPeps(file)
-    
+
     // O controller retorna: { message, statistics: { total_imported, total_skipped, total_failed }, failures? }
     const statistics = response.data.statistics || {}
     const totalImported = statistics.total_imported || 0
@@ -1000,7 +1022,7 @@ async function handlePepsUpload(file) {
     message += `📥 Importados: ${totalImported}\n`
     message += `⏭️ Ignorados: ${totalSkipped}\n`
     message += `❌ Falhas: ${totalFailed}`
-    
+
     if (failures.length > 0) {
       message += `\n\n⚠️ Detalhes das falhas:`
       failures.slice(0, 5).forEach((failure, index) => {
@@ -1018,15 +1040,15 @@ async function handlePepsUpload(file) {
     setTimeout(() => {
       successMessage.value = ''
     }, 8000) // Aumentado para 8 segundos para dar tempo de ler
-
   } catch (error) {
     console.error('Erro ao fazer upload de PEPS:', error)
-    
+
     // Tratamento específico para erros de validação (422)
     if (error.response?.status === 422) {
       const errors = error.response.data.errors || []
-      let errorMsg = error.response.data.message || 'Erro ao processar arquivo. Algumas linhas contêm erros.'
-      
+      let errorMsg =
+        error.response.data.message || 'Erro ao processar arquivo. Algumas linhas contêm erros.'
+
       if (errors.length > 0) {
         errorMsg += '\n\nDetalhes:'
         errors.slice(0, 5).forEach((err, index) => {
@@ -1036,12 +1058,13 @@ async function handlePepsUpload(file) {
           errorMsg += `\n  ... e mais ${errors.length - 5} erro(s)`
         }
       }
-      
+
       errorMessage.value = errorMsg
     } else {
-      errorMessage.value = error.response?.data?.message || 
-                          error.response?.data?.error || 
-                          'Erro ao fazer upload do arquivo PEPS. Verifique o formato do arquivo e tente novamente.'
+      errorMessage.value =
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        'Erro ao fazer upload do arquivo PEPS. Verifique o formato do arquivo e tente novamente.'
     }
   } finally {
     isLoading.value = false
@@ -1068,21 +1091,27 @@ function handleCji3Upload(file) {
   console.log('Upload de CJI3:', file)
   // Implementar quando necessário
 }
-
-
 </script>
 
 <style scoped>
+td {
+  text-align: center;
+}
+
+th {
+  text-align: center;
+  align-items: center;
+}
 
 .admin-content {
-  padding: 2rem;
+  padding: 1rem;
   max-width: 1900px;
   margin: 0 auto;
 }
 
 .admin-card {
   background: white;
-  padding: 2rem;
+  padding: 1rem;
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
@@ -1102,7 +1131,7 @@ function handleCji3Upload(file) {
   display: flex;
   flex-wrap: nowrap;
   gap: 1.25rem;
-  margin-bottom: 2rem;
+  padding-top: 10px;
   align-items: stretch;
   overflow-x: auto;
   padding-bottom: 0.5rem;
@@ -1251,7 +1280,7 @@ function handleCji3Upload(file) {
   .users-table {
     font-size: 0.8rem;
   }
-  
+
   .users-table th,
   .users-table td {
     padding: 0.6rem 0.5rem;
@@ -1268,11 +1297,11 @@ function handleCji3Upload(file) {
 }
 
 .users-table td {
-padding: 0.8rem 1rem;
-    font-size: 0.875rem;
-    border-bottom: 1px solid #e0e0e0;
-    vertical-align: middle;
-    white-space: nowrap;
+  padding: 0.8rem 1rem;
+  font-size: 0.875rem;
+  border-bottom: 1px solid #e0e0e0;
+  vertical-align: middle;
+  white-space: nowrap;
 }
 
 .users-table tr:hover {
@@ -1280,17 +1309,23 @@ padding: 0.8rem 1rem;
 }
 
 .access-level {
-  padding: 0.25rem 0.75rem;
-  border-radius: 12px;
-  font-size: 0.875rem;
-  font-weight: 500;
+display: inline-flex;      
+  justify-content: center;    
+  align-items: center;       
+  width: 140px;             
+  height: 30px;               
+  padding: 0;                
+  border-radius: 20px;       
+  font-size: 0.75rem;        
+  font-weight: 700;          
   text-transform: uppercase;
+  letter-spacing: 0.5px;    
+  white-space: nowrap;
 }
 
 .access-level.admin {
   background-color: #ffebee;
   color: #c62828;
-  
 }
 
 .access-level.exata {
@@ -1322,6 +1357,10 @@ padding: 0.8rem 1rem;
   border-radius: 4px;
   transition: background-color 0.3s ease;
   font-size: 1.2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #0f2410;
 }
 
 .edit-btn:hover {
@@ -1541,7 +1580,6 @@ padding: 0.8rem 1rem;
   max-height: 90vh;
   overflow-y: auto;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-  
 }
 
 .modal-header {
@@ -1561,25 +1599,23 @@ padding: 0.8rem 1rem;
 .modal-hr {
   width: 92%;
   margin: auto;
-
 }
 
 .modal-content::-webkit-scrollbar {
-  width: 14px; 
-
+  width: 14px;
 }
 
 .modal-content::-webkit-scrollbar-track {
-  background: transparent; 
-  
-  border-right: 4px solid white; 
+  background: transparent;
+
+  border-right: 4px solid white;
   background-clip: content-box;
 }
 
 .modal-content::-webkit-scrollbar-thumb {
-  background-color: #cccccc; 
+  background-color: #cccccc;
   border-radius: 10px; /* Deixa a barra arredondada */
-  border: 4px solid white; 
+  border: 4px solid white;
 }
 
 .modal-content::-webkit-scrollbar-thumb:hover {
@@ -1591,11 +1627,14 @@ padding: 0.8rem 1rem;
   border: none;
   font-size: 1.5rem;
   cursor: pointer;
-  color: #666;
-  padding: 0.25rem;
-  border-radius: 4px;
+  color: black;
+  padding:0.1rem 0.6rem 0.2rem 0.6rem;
+  border-radius: 30px;
   transition: background-color 0.3s ease;
   margin-right: 15px;
+  justify-content: center;
+  align-items: center;
+  display: inline-flex;
 }
 
 .close-btn:hover {
@@ -1643,7 +1682,7 @@ padding: 0.8rem 1rem;
   font-weight: 600;
   color: rgba(0, 0, 0, 0.6);
   margin-top: 30px;
-   margin-left: 23px;
+  margin-left: 23px;
   font-size: 19px;
 }
 
@@ -1735,34 +1774,29 @@ padding: 0.8rem 1rem;
   gap: 3rem;
   justify-content: center;
   margin-top: 1rem;
-
-
- 
 }
 
 .cancel-btn {
   width: 45%;
   padding: 13px;
   font-size: 20px;
-  border:  1px solid black;
+  border: 1px solid black;
   border-radius: 10px;
   background-color: rgba(139, 14, 14, 0.8);
   color: white;
-    cursor: pointer;
-      transition: all 0.3s ease;
-
+  cursor: pointer;
+  transition: all 0.3s ease;
 }
 
 .submit-btn {
   width: 45%;
   font-size: 20px;
-  border:  1px solid black;
+  border: 1px solid black;
   border-radius: 10px;
   background-color: rgba(19, 44, 13, 0.8);
   color: white;
   cursor: pointer;
   transition: all 0.3s ease;
-
 }
 
 .submit-btn:hover {
@@ -1776,7 +1810,6 @@ padding: 0.8rem 1rem;
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(139, 14, 14, 0.8);
 }
-
 
 .confirmation-backdrop {
   position: fixed;
@@ -1873,7 +1906,7 @@ padding: 0.8rem 1rem;
 }
 
 .action-confirm {
-  background-color: #B83A3A;
+  background-color: #b83a3a;
   border: 1px solid black;
   border-radius: 10px;
   background-color: rgba(139, 14, 14, 0.8);
@@ -1999,15 +2032,7 @@ padding: 0.8rem 1rem;
   }
 }
 
-/* Melhorias adicionais no Grid System */
-.admin-content {
-  /* Mantém o layout original mas com melhor espaçamento */
-  padding: 2rem;
-  max-width: 1900px;
-  margin: 0 auto;
-}
 
-/* Responsividade adicional para o Modal */
 
 /* Telas Médias (tablets) - a partir de 1024px para baixo */
 @media (max-width: 1024px) {
@@ -2039,7 +2064,8 @@ padding: 0.8rem 1rem;
     gap: 1rem;
   }
 
-  .submit-btn, .cancel-btn {
+  .submit-btn,
+  .cancel-btn {
     padding: 12px;
     font-size: 18px;
   }
@@ -2057,7 +2083,6 @@ padding: 0.8rem 1rem;
   }
 }
 
-
 /* Telas Pequenas (celulares) - a partir de 768px para baixo */
 @media (max-width: 768px) {
   .modal-content {
@@ -2068,7 +2093,7 @@ padding: 0.8rem 1rem;
     max-height: 85vh; /* Garante espaço para a interface do navegador */
     padding: 0.5rem;
   }
-  
+
   .modal-header {
     padding: 1rem;
   }
@@ -2095,7 +2120,7 @@ padding: 0.8rem 1rem;
     width: 100%; /* Ocupa a largura total */
     margin-left: 0;
   }
-  
+
   /* Faz com que as mensagens e os botões continuem ocupando a largura total */
   .error-message,
   .success-message,
@@ -2118,7 +2143,7 @@ padding: 0.8rem 1rem;
 
   .confirmation-window {
     width: 95%; /* Ocupa quase toda a largura */
-    max-width: none; 
+    max-width: none;
     height: auto;
     max-height: 90vh;
     padding: 1.5rem; /* Menos padding interno para sobrar espaço pro conteúdo */

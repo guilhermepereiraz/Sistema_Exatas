@@ -1,5 +1,5 @@
 <template>
-  <div class="popoverlay" >
+  <div class="popoverlay" @click="handleClose">
     <div class="popupview">
       <div class="tituloload">
         <IconExit class="iconexit" @click="handleClose"/>
@@ -51,7 +51,7 @@
           :disabled="!selectedFile || isUploading"
           class="btn-upload"
         >
-          <span v-if="isUploading">⏳ Processando...</span>
+          <span v-if="isUploading">Processando...</span>
           <span v-else>{{ uploadLabel }}</span>
         </button>
       </div>
@@ -94,7 +94,7 @@ const props = defineProps({
   },
   uploadLabel: {
     type: String,
-    default: '📤 Enviar Arquivo'
+    default: 'Enviar Arquivo'
   },
   hintText: {
     type: String,
@@ -303,7 +303,7 @@ border: 2px solid #868686;
 .loadprocss.dragging {
   border: 2px dashed #2e7d32;
   background-color: #e8f5e9;
-  transform: scale(1.02);
+
 }
 
 .loadprocss.has-file {

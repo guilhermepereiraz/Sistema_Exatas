@@ -30,6 +30,10 @@ const contratoSelecionado = ref(null)
 const uploadFeedback = ref({ type: '', message: '' })
 const isUploadingContrato = ref(false)
 
+function irParaImobMensal() {
+  router.push({ name: 'imobmensal' })
+}
+
 // 3. Carrega dados quando o componente é montado
 onMounted(async () => {
   const user = authService.getCurrentUser()
@@ -37,7 +41,7 @@ onMounted(async () => {
     router.push('/')
     return
   }
-  
+
   // Verifica se há filtro de divisão na URL
   const divisaoId = route.query.divisao
   if (divisaoId) {
@@ -45,25 +49,28 @@ onMounted(async () => {
     // TODO: Buscar nome da divisão da API se necessário
     nomeDivisao.value = `Divisão ${divisaoId}`
   }
-  
+
   // 4. Chama a função para carregar contratos
   await loadContratos(1)
 })
 
 // Observa mudanças na rota para atualizar filtro
-watch(() => route.query.divisao, (newDivisao) => {
-  if (newDivisao) {
-    divisaoFiltro.value = Number(newDivisao)
-    nomeDivisao.value = `Divisão ${newDivisao}`
-    // Recarrega contratos com novo filtro
-    loadContratos(1)
-  } else {
-    divisaoFiltro.value = null
-    nomeDivisao.value = ''
-    // Recarrega contratos sem filtro
-    loadContratos(1)
-  }
-})
+watch(
+  () => route.query.divisao,
+  (newDivisao) => {
+    if (newDivisao) {
+      divisaoFiltro.value = Number(newDivisao)
+      nomeDivisao.value = `Divisão ${newDivisao}`
+      // Recarrega contratos com novo filtro
+      loadContratos(1)
+    } else {
+      divisaoFiltro.value = null
+      nomeDivisao.value = ''
+      // Recarrega contratos sem filtro
+      loadContratos(1)
+    }
+  },
+)
 
 // 5. Função para carregar CONTRATOS com paginação e filtros
 async function loadContratos(page = 1) {
@@ -75,7 +82,7 @@ async function loadContratos(page = 1) {
     if (divisaoFiltro.value) {
       filters.divisao_id = divisaoFiltro.value
     }
-    
+
     console.log('Carregando contratos com filtros:', filters)
     const response = await contratoApi.getContratos(page, 10, filters)
 
@@ -87,22 +94,21 @@ async function loadContratos(page = 1) {
         currentPage.value = response.data.meta.current_page || page
         totalPages.value = response.data.meta.last_page || 1
         totalContratos.value = response.data.meta.total || 0
-      } 
+      }
       // Fallback: se data é um array direto (sem paginação)
       else if (Array.isArray(response.data)) {
         contratos.value = response.data
         totalPages.value = 1
         currentPage.value = 1
         totalContratos.value = response.data.length
-      } 
+      }
       // Fallback: estrutura alternativa
       else if (response.data.contratos && Array.isArray(response.data.contratos)) {
         contratos.value = response.data.contratos
         currentPage.value = response.data.current_page || page
         totalPages.value = response.data.last_page || 1
         totalContratos.value = response.data.total || response.data.contratos.length
-      } 
-      else {
+      } else {
         console.warn('Formato de resposta inesperado para contratos:', response.data)
         contratos.value = []
         totalPages.value = 1
@@ -117,7 +123,9 @@ async function loadContratos(page = 1) {
     }
   } catch (error) {
     console.error('Erro ao carregar contratos:', error)
-    errorMessage.value = 'Erro ao carregar lista de contratos: ' + (error.response?.data?.message || error.message || 'Erro desconhecido')
+    errorMessage.value =
+      'Erro ao carregar lista de contratos: ' +
+      (error.response?.data?.message || error.message || 'Erro desconhecido')
     contratos.value = []
     totalPages.value = 1
     currentPage.value = 1
@@ -130,43 +138,47 @@ async function loadContratos(page = 1) {
 // Navega para uma página específica
 function goToPage(page) {
   console.log('goToPage chamado com:', { page, type: typeof page })
-  
+
   // Valida se a página é válida (não pode ser string como '...')
   if (typeof page === 'string' && page !== '...' && isNaN(Number(page))) {
     console.warn('Página inválida (string não numérica):', page)
     return
   }
-  
+
   if (page === '...') {
     console.warn('Tentativa de navegar para ellipsis')
     return
   }
-  
+
   const targetPage = Number(page)
-  
+
   if (isNaN(targetPage)) {
     console.warn('Página não é um número:', page)
     return
   }
-  
-  console.log('Página convertida:', { targetPage, currentPage: currentPage.value, totalPages: totalPages.value })
-  
+
+  console.log('Página convertida:', {
+    targetPage,
+    currentPage: currentPage.value,
+    totalPages: totalPages.value,
+  })
+
   // Valida se a página está dentro do range válido
   if (targetPage < 1 || targetPage > totalPages.value) {
     console.warn('Página fora do range:', { targetPage, totalPages: totalPages.value })
     return
   }
-  
+
   // Evita recarregar a mesma página
   if (targetPage === currentPage.value) {
     console.log('Já está na página:', targetPage)
     return
   }
-  
+
   console.log('Carregando página:', targetPage)
   // Carrega a página
   loadContratos(targetPage)
-  
+
   // Scroll para o topo da tabela após um pequeno delay
   setTimeout(() => {
     const tableContainer = document.querySelector('.table-container')
@@ -183,7 +195,7 @@ function getPageNumbers() {
   const pages = []
   const total = totalPages.value
   const current = currentPage.value
-  
+
   if (total <= 7) {
     // Se há 7 ou menos páginas, mostra todas
     for (let i = 1; i <= total; i++) {
@@ -192,7 +204,7 @@ function getPageNumbers() {
   } else {
     // Sempre mostra primeira página
     pages.push(1)
-    
+
     if (current <= 3) {
       // Perto do início
       for (let i = 2; i <= 4; i++) {
@@ -216,13 +228,13 @@ function getPageNumbers() {
       pages.push(total)
     }
   }
-  
+
   return pages
 }
 
 // Função helper para calcular range de contratos exibidos
 function getContratosRange() {
-  const start = ((currentPage.value - 1) * 10) + 1
+  const start = (currentPage.value - 1) * 10 + 1
   const end = Math.min(currentPage.value * 10, totalContratos.value)
   return { start, end }
 }
@@ -263,9 +275,9 @@ async function handleContratoUpload(file) {
     await loadContratos(currentPage.value)
   } catch (error) {
     const apiMessage = error.response?.data?.message
-    uploadFeedback.value = { 
-      type: 'error', 
-      message: apiMessage || 'Erro ao enviar arquivo. Tente novamente.' 
+    uploadFeedback.value = {
+      type: 'error',
+      message: apiMessage || 'Erro ao enviar arquivo. Tente novamente.',
     }
   } finally {
     isUploadingContrato.value = false
@@ -312,16 +324,17 @@ function formatDate(dateString) {
     <main class="admin-content">
       <h2 class="h2projeto">Projetos</h2>
 
-      <div 
-        v-if="uploadFeedback.message" 
-        :class="['upload-feedback', uploadFeedback.type]"
-      >
+      <div v-if="uploadFeedback.message" :class="['upload-feedback', uploadFeedback.type]">
         <span>{{ uploadFeedback.message }}</span>
-        <button class="upload-feedback-close" @click="uploadFeedback = { type: '', message: '' }" title="Fechar alerta">
+        <button
+          class="upload-feedback-close"
+          @click="uploadFeedback = { type: '', message: '' }"
+          title="Fechar alerta"
+        >
           ✕
         </button>
       </div>
-      
+
       <!-- Indicador de Filtro de Divisão -->
       <div v-if="divisaoFiltro" class="filtro-divisao-badge">
         <span class="filtro-label">Filtrando por:</span>
@@ -330,7 +343,7 @@ function formatDate(dateString) {
           ✕
         </button>
       </div>
-      
+
       <div class="admin-card">
         <div class="users-section">
           <!-- <div class="users-header">
@@ -356,42 +369,51 @@ function formatDate(dateString) {
             <table v-else class="users-table">
               <thead>
                 <tr>
-                  <th>Código Contrato</th>
-                  <th>Referência</th>
-                  <th>Descrição</th>
-                  <th>Centro Custo</th>
-                  <th>Divisão</th>
-                  <th>Administrador</th>
-                  <th>Fornecedor</th>
-                  <th>Status</th>
-                  <th>Data Término</th>
-                  <th>Ações</th>
+                  <th style="text-align: center">Código Contrato</th>
+                  <th style="text-align: center">Divisão</th>
+                  <th style="text-align: center">Referência</th>
+                  <th style="text-align: center">Centro Custo</th>
+                  <th style="text-align: center">Administrador</th>
+                  <th style="text-align: center">Fornecedor</th>
+                  <th style="text-align: center">Descrição</th>
+                  <th style="text-align: center">Data Término</th>
+                  <th style="text-align: center">Status</th>
+                  <!-- <th style="text-align: center">Ações</th> -->
                 </tr>
               </thead>
               <tbody>
                 <tr v-for="contrato in contratos" :key="contrato.codigo_contrato">
                   <td>{{ contrato.codigo_contrato || '-' }}</td>
-                  <td>{{ contrato.referencia || '-' }}</td>
-                  <td>{{ contrato.descricao || '-' }}</td>
-                  <td>{{ contrato.centro_custo || '-' }}</td>
+
                   <td>{{ contrato.divisao_id || '-' }}</td>
+
+                  <td>{{ contrato.referencia || '-' }}</td>
+
+                  <td>{{ contrato.centro_custo || '-' }}</td>
+
                   <td>{{ contrato.administrador || '-' }}</td>
+
                   <td>{{ contrato.fornecedor || '-' }}</td>
+
+                  <td>{{ contrato.descricao || '-' }}</td>
+
+                  <td>{{ formatDate(contrato.data_termino) }}</td>
+
                   <td>
                     <span class="status" :class="getStatusLabel(contrato.concluido)">
                       {{ getStatusLabel(contrato.concluido) }}
                     </span>
                   </td>
-                  <td>{{ formatDate(contrato.data_termino) }}</td>
-                  <td class="acoes-col">
-                    <button 
-                      class="btn-upload-contrato" 
+
+                  <!-- <td class="acoes-col">
+                    <button
+                      class="btn-upload-contrato"
                       @click="abrirUploadContrato(contrato)"
                       :disabled="isUploadingContrato"
                     >
                       Atualizar contrato
                     </button>
-                  </td>
+                  </td> -->
                 </tr>
               </tbody>
             </table>
@@ -400,35 +422,38 @@ function formatDate(dateString) {
             <div v-if="!isLoadingContratos && contratos.length > 0" class="pagination-container">
               <div class="pagination-info">
                 <span>
-                  Mostrando {{ getContratosRange().start }} a {{ getContratosRange().end }} 
-                  de {{ totalContratos }} contrato{{ totalContratos !== 1 ? 's' : '' }}
+                  Mostrando {{ getContratosRange().start }} a {{ getContratosRange().end }} de
+                  {{ totalContratos }} contrato{{ totalContratos !== 1 ? 's' : '' }}
                 </span>
               </div>
-              
+
               <div class="pagination-controls">
-                <button 
-                  @click="goToPage(currentPage - 1)" 
+                <button
+                  @click="goToPage(currentPage - 1)"
                   :disabled="currentPage === 1 || isLoadingContratos"
                   class="pagination-btn"
                   title="Página anterior"
                 >
                   ← Anterior
                 </button>
-                
+
                 <div class="pagination-pages">
                   <button
                     v-for="page in getPageNumbers()"
                     :key="page"
                     @click="goToPage(page)"
                     :disabled="isLoadingContratos"
-                    :class="['pagination-page-btn', { 'active': page === currentPage, 'ellipsis': page === '...' }]"
+                    :class="[
+                      'pagination-page-btn',
+                      { active: page === currentPage, ellipsis: page === '...' },
+                    ]"
                   >
                     {{ page }}
                   </button>
                 </div>
-                
-                <button 
-                  @click="goToPage(currentPage + 1)" 
+
+                <button
+                  @click="goToPage(currentPage + 1)"
                   :disabled="currentPage >= totalPages || isLoadingContratos || totalPages <= 1"
                   class="pagination-btn"
                   title="Próxima página"
@@ -463,6 +488,10 @@ function formatDate(dateString) {
           Próxima →
         </button>
       </div>
+
+      <div class="div_proximo">
+        <button class="bnt_proximo" @click="irParaImobMensal">Próximo</button>
+      </div>
     </main>
 
     <!-- Popup de upload de contrato -->
@@ -476,10 +505,10 @@ function formatDate(dateString) {
         'application/msword',
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         'application/vnd.ms-excel',
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       ]"
       :max-size-m-b="15"
-      upload-label="📤 Enviar contrato"
+      upload-label="Enviar Contrato"
       hint-text="Formatos: PDF, DOC, DOCX, XLS, XLSX (até 15MB)"
       @close="fecharUploadPopup"
       @upload="handleContratoUpload"
@@ -492,6 +521,11 @@ function formatDate(dateString) {
 
 /* NOVA REGRA: Impede que a PÁGINA inteira tenha scroll horizontal 
 */
+
+td {
+  text-align: center;
+}
+
 .admin-panel {
   overflow-x: hidden;
 }
@@ -500,11 +534,13 @@ function formatDate(dateString) {
   padding: 2rem;
   max-width: 1900px;
   margin: 0 auto;
+  box-sizing: border-box; /* ESSENCIAL: Faz o padding contar DENTRO da largura */
+  overflow: hidden;
 }
 
 .admin-card {
   background: white;
-  padding: 2rem;
+  padding: 1rem;
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
@@ -512,8 +548,9 @@ function formatDate(dateString) {
 .h2projeto {
   color: black;
   margin-bottom: 1rem;
-  font-size: 3rem;
+  font-size: 2rem;
   text-align: center;
+  margin-top: -15px;
 }
 
 /* Badge de Filtro de Divisão */
@@ -605,7 +642,7 @@ function formatDate(dateString) {
 .table-container {
   overflow-x: auto; /* Permite scroll horizontal */
   overflow-y: auto;
-  max-height: 60vh; /* Reduzido para 60vh para evitar scroll da página */
+  max-height: 65vh; /* Reduzido para 60vh para evitar scroll da página */
   border-radius: 8px;
   border: 1px solid #e0e0e0;
 }
@@ -640,9 +677,9 @@ function formatDate(dateString) {
   white-space: nowrap;
 }
 
-/* Permite que a descrição (coluna 3) quebre a linha */
-.users-table th:nth-child(3),
-.users-table td:nth-child(3) {
+/* Permite que a descrição (coluna 7) quebre a linha */
+.users-table th:nth-child(7),
+.users-table td:nth-child(7) {
   white-space: normal;
   min-width: 250px;
 }
@@ -653,11 +690,18 @@ function formatDate(dateString) {
 
 /* Estilos para o STATUS */
 .status {
-  padding: 0.25rem 0.75rem;
-  border-radius: 12px;
-  font-size: 0.8rem; /* Fonte do status um pouco menor */
-  font-weight: 500;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  width: 140px;
+  height: 30px;
+  padding: 0;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 700;
   text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
 }
 
 /* Classe para Status 'Ativo' (baseado no 0) */
@@ -904,5 +948,25 @@ function formatDate(dateString) {
   opacity: 0.6;
   cursor: not-allowed;
   transform: none;
+}
+.div_proximo {
+  text-align: center;
+  margin-top: 20px;
+}
+.bnt_proximo {
+  width: 150px;
+  padding: 0.6rem;
+  border: none;
+  border-radius: 10px;
+  color: white;
+  background-color: rgba(19, 44, 13, 0.6);
+  transition: all 0.3s ease;
+  cursor: pointer;
+  font-size: 15px;
+}
+
+.bnt_proximo:hover {
+  background-color: #0f2410;
+  transform: translateY(-1px);
 }
 </style>

@@ -30,7 +30,7 @@ const oldPassword = ref('')
 const newPassword = ref('')
 const confirmPassword = ref('')
 
-const placeholderAvatar = '/Imagens/Carregar_foto_perfil.png'
+const placeholderAvatar = '/Imagens/3d_avatar_21.png'
 
 const userData = ref({
   nome: '',
@@ -46,12 +46,12 @@ const originalUserData = ref(null)
 // Helper para construir URL completa da foto
 function getPhotoUrl(photoUrl) {
   if (!photoUrl) return placeholderAvatar
-  
+
   // Se já é uma URL completa (http:// ou https://), retorna como está
   if (photoUrl.startsWith('http://') || photoUrl.startsWith('https://')) {
     return photoUrl
   }
-  
+
   // Se começa com /, adiciona baseURL da API
   if (photoUrl.startsWith('/')) {
     const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api/v1'
@@ -59,7 +59,7 @@ function getPhotoUrl(photoUrl) {
     const apiBase = baseURL.replace('/api/v1', '')
     return `${apiBase}${photoUrl}`
   }
-  
+
   return photoUrl
 }
 
@@ -68,25 +68,25 @@ async function loadUserData() {
   try {
     isLoading.value = true
     errorMessage.value = ''
-    
+
     const user = authService.getCurrentUser()
-    
+
     if (!user || !user.id) {
       router.push('/')
       return
     }
-    
+
     userId.value = user.id
-    
+
     // Busca dados completos do usuário da API
     const response = await userApi.getUser(user.id)
     const userDataFromApi = response.data.data || response.data
-    
+
     // Preenche dados básicos do usuário
     userName.value = userDataFromApi.name || user.name || 'Usuário'
     userEmail.value = userDataFromApi.email || user.email || 'N/A'
     userType.value = userDataFromApi.nivel_acesso || user.nivel_acesso || 'Usuário'
-    
+
     // Configura foto do usuário
     if (userDataFromApi.photo_url) {
       userPhotoUrl.value = userDataFromApi.photo_url
@@ -95,17 +95,17 @@ async function loadUserData() {
       userPhotoUrl.value = null
       userData.value.avatar = placeholderAvatar
     }
-    
+
     // Formata data de criação
     if (userDataFromApi.created_at) {
       const date = new Date(userDataFromApi.created_at)
       userData.value.criadoEm = date.toLocaleDateString('pt-BR', {
         day: 'numeric',
         month: 'long',
-        year: 'numeric'
+        year: 'numeric',
       })
     }
-    
+
     userData.value.nome = userName.value
     userData.value.email = userEmail.value
 
@@ -137,11 +137,10 @@ async function loadUserData() {
 
     userData.value.divisaoCodigo = divisaoCodigo || ''
     userData.value.divisaoNome = divisaoNome || ''
-    
   } catch (error) {
     console.error('Erro ao carregar dados do usuário:', error)
     errorMessage.value = 'Erro ao carregar dados do usuário. Tente novamente.'
-    
+
     // Fallback para dados do localStorage
     const user = authService.getCurrentUser()
     if (user) {
@@ -177,26 +176,26 @@ async function salvarAlteracoes() {
     isLoading.value = true
     errorMessage.value = ''
     successMessage.value = ''
-    
+
     // Se há um arquivo selecionado, faz upload
     if (selectedFile.value) {
       const response = await userApi.uploadPhoto(userId.value, selectedFile.value)
-      
+
       // Atualiza a URL da foto com a resposta da API
       const photoUrl = response.data.data?.photo_url || response.data.photo_url
       if (photoUrl) {
         userPhotoUrl.value = photoUrl
         userData.value.avatar = getPhotoUrl(photoUrl)
       }
-      
+
       // Limpa o arquivo selecionado
       selectedFile.value = null
       successMessage.value = 'Foto atualizada com sucesso!'
     }
-    
+
     // Nome e email não podem ser editados pelo próprio usuário
     // Apenas a foto pode ser alterada
-    
+
     // Atualiza dados no localStorage
     const user = authService.getCurrentUser()
     if (user) {
@@ -204,23 +203,23 @@ async function salvarAlteracoes() {
         user.photo_url = userPhotoUrl.value
       }
       localStorage.setItem('user_data', JSON.stringify(user))
-      
+
       // Dispara evento para atualizar headers na mesma aba
       window.dispatchEvent(new Event('userPhotoUpdated'))
     }
-    
+
     isEditing.value = false
-    
+
     // Limpa mensagem de sucesso após 3 segundos
     setTimeout(() => {
       successMessage.value = ''
     }, 3000)
-    
   } catch (error) {
     console.error('Erro ao salvar alterações:', error)
-    errorMessage.value = error.response?.data?.message || 
-                        error.response?.data?.error || 
-                        'Erro ao salvar alterações. Tente novamente.'
+    errorMessage.value =
+      error.response?.data?.message ||
+      error.response?.data?.error ||
+      'Erro ao salvar alterações. Tente novamente.'
   } finally {
     isLoading.value = false
   }
@@ -232,12 +231,12 @@ function cancelarAlteracao() {
   isEditing.value = false
   errorMessage.value = ''
   successMessage.value = ''
-  
+
   // Limpa o input de arquivo
   if (fileInput.value) {
     fileInput.value.value = ''
   }
-  
+
   // Restaura a foto original se havia uma selecionada
   if (userPhotoUrl.value) {
     userData.value.avatar = getPhotoUrl(userPhotoUrl.value)
@@ -267,17 +266,17 @@ function onFileChange(event) {
     // Validação do arquivo
     const maxSize = 2 * 1024 * 1024 // 2MB
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif']
-    
+
     if (!allowedTypes.includes(file.type)) {
       errorMessage.value = 'Formato de arquivo não permitido. Use JPG, PNG ou GIF.'
       return
     }
-    
+
     if (file.size > maxSize) {
       errorMessage.value = 'Arquivo muito grande. Tamanho máximo: 2MB.'
       return
     }
-    
+
     selectedFile.value = file
     userData.value.avatar = URL.createObjectURL(file)
     errorMessage.value = ''
@@ -288,43 +287,43 @@ async function removePhoto() {
   if (!confirm('Tem certeza que deseja remover sua foto de perfil?')) {
     return
   }
-  
+
   try {
     isLoading.value = true
     errorMessage.value = ''
-    
+
     await userApi.removePhoto(userId.value)
-    
+
     userPhotoUrl.value = null
     userData.value.avatar = placeholderAvatar
     selectedFile.value = null
-    
+
     // Atualiza dados no localStorage
     const user = authService.getCurrentUser()
     if (user) {
       user.photo_url = null
       localStorage.setItem('user_data', JSON.stringify(user))
-      
+
       // Dispara evento para atualizar headers na mesma aba
       window.dispatchEvent(new Event('userPhotoUpdated'))
     }
-    
+
     successMessage.value = 'Foto removida com sucesso!'
-    
+
     // Limpa o input de arquivo
     if (fileInput.value) {
       fileInput.value.value = ''
     }
-    
+
     setTimeout(() => {
       successMessage.value = ''
     }, 3000)
-    
   } catch (error) {
     console.error('Erro ao remover foto:', error)
-    errorMessage.value = error.response?.data?.message || 
-                        error.response?.data?.error || 
-                        'Erro ao remover foto. Tente novamente.'
+    errorMessage.value =
+      error.response?.data?.message ||
+      error.response?.data?.error ||
+      'Erro ao remover foto. Tente novamente.'
   } finally {
     isLoading.value = false
   }
@@ -366,48 +365,49 @@ async function saveNewPassword() {
       setPasswordError('Por favor, informe sua senha atual.')
       return
     }
-    
+
     if (!newPassword.value || newPassword.value.length < 8) {
       setPasswordError('A nova senha deve ter no mínimo 8 caracteres.')
       return
     }
-    
+
     if (newPassword.value !== confirmPassword.value) {
       setPasswordError('As senhas não coincidem.')
       return
     }
-    
+
     if (oldPassword.value === newPassword.value) {
       setPasswordError('A nova senha deve ser diferente da senha atual.')
       return
     }
-    
+
     isLoading.value = true
     errorMessage.value = ''
     successMessage.value = ''
-    
+
     console.log('Alterando senha...')
-    
+
     // Chama o endpoint de alteração de senha
     const response = await userApi.changePassword({
       current_password: oldPassword.value,
       password: newPassword.value,
-      password_confirmation: confirmPassword.value
+      password_confirmation: confirmPassword.value,
     })
-    
+
     console.log('Resposta da API:', response.data)
-    
+
     // Verifica diferentes formatos de resposta
-    const isSuccess = response.data?.success === true || 
-                     response.status === 200 || 
-                     response.status === 201 ||
-                     (response.data?.message && !response.data?.errors)
-    
+    const isSuccess =
+      response.data?.success === true ||
+      response.status === 200 ||
+      response.status === 201 ||
+      (response.data?.message && !response.data?.errors)
+
     if (isSuccess) {
       const msg = response.data?.message || 'Senha alterada com sucesso!'
       setPasswordSuccess(msg)
       hidePasswordFields()
-      
+
       // Limpa mensagem após 5 segundos
       setTimeout(() => {
         successMessage.value = ''
@@ -419,31 +419,43 @@ async function saveNewPassword() {
     console.error('Erro completo ao alterar senha:', error)
     console.error('Response data:', error.response?.data)
     console.error('Response status:', error.response?.status)
-    
+
     // Tratamento específico para diferentes tipos de erro
     if (error.response?.status === 422) {
       // Erro de validação
       const errors = error.response.data?.errors
       if (errors?.current_password) {
-        setPasswordError(Array.isArray(errors.current_password) ? errors.current_password[0] : errors.current_password)
+        setPasswordError(
+          Array.isArray(errors.current_password)
+            ? errors.current_password[0]
+            : errors.current_password,
+        )
       } else if (errors?.password) {
         setPasswordError(Array.isArray(errors.password) ? errors.password[0] : errors.password)
       } else if (errors?.password_confirmation) {
-        setPasswordError(Array.isArray(errors.password_confirmation) ? errors.password_confirmation[0] : errors.password_confirmation)
+        setPasswordError(
+          Array.isArray(errors.password_confirmation)
+            ? errors.password_confirmation[0]
+            : errors.password_confirmation,
+        )
       } else {
-        setPasswordError(error.response.data?.message || 'Dados inválidos. Verifique as informações fornecidas.')
+        setPasswordError(
+          error.response.data?.message || 'Dados inválidos. Verifique as informações fornecidas.',
+        )
       }
     } else if (error.response?.status === 401) {
       setPasswordError('Senha atual incorreta. Verifique e tente novamente.')
     } else if (error.response?.status === 400) {
-      setPasswordError(error.response.data?.message || 'Erro ao alterar senha. Verifique os dados informados.')
+      setPasswordError(
+        error.response.data?.message || 'Erro ao alterar senha. Verifique os dados informados.',
+      )
     } else if (error.response?.status === 500) {
       setPasswordError('Erro interno do servidor. Tente novamente mais tarde.')
     } else {
       setPasswordError(
-        error.response?.data?.message || 
-        error.response?.data?.error ||
-        'Erro ao alterar senha. Verifique sua conexão e tente novamente.'
+        error.response?.data?.message ||
+          error.response?.data?.error ||
+          'Erro ao alterar senha. Verifique sua conexão e tente novamente.',
       )
     }
   } finally {
@@ -480,18 +492,10 @@ function hidePasswordFields() {
       </button>
 
       <div v-if="isEditing" class="action-buttons">
-        <button 
-          class="btn-salvar" 
-          @click="salvarAlteracoes"
-          :disabled="isLoading"
-        >
+        <button class="btn-salvar" @click="salvarAlteracoes" :disabled="isLoading">
           {{ isLoading ? 'Salvando...' : 'Salvar' }}
         </button>
-        <button 
-          class="btn-cancelar" 
-          @click="cancelarAlteracao"
-          :disabled="isLoading"
-        >
+        <button class="btn-cancelar" @click="cancelarAlteracao" :disabled="isLoading">
           Cancelar
         </button>
       </div>
@@ -540,9 +544,7 @@ function hidePasswordFields() {
           <span v-if="userData.divisaoCodigo && userData.divisaoNome"> - </span>
           <span v-if="userData.divisaoNome">{{ userData.divisaoNome }}</span>
         </h2>
-        <h2 v-else>
-          Não informado
-        </h2>
+        <h2 v-else>Não informado</h2>
       </div>
 
       <div class="detail-item item-avatar">
@@ -555,8 +557,8 @@ function hidePasswordFields() {
             @click="isEditing ? triggerFileInput() : null"
           />
           <div v-if="isEditing" class="avatar-actions">
-            <button 
-              class="btn-remove-photo" 
+            <button
+              class="btn-remove-photo"
               @click="removePhoto"
               :disabled="!userPhotoUrl && !selectedFile"
               title="Remover foto"
@@ -575,7 +577,12 @@ function hidePasswordFields() {
       <div class="detail-item item-senha">
         <h1>Senha:</h1>
         <h2>••••••••</h2>
-        <button v-if="!isChangingPassword" @click="showPasswordFields" class="alt_bnt" :disabled="isLoading">
+        <button
+          v-if="!isChangingPassword"
+          @click="showPasswordFields"
+          class="alt_bnt"
+          :disabled="isLoading"
+        >
           Alterar Senha
         </button>
       </div>
@@ -583,11 +590,7 @@ function hidePasswordFields() {
   </div>
 
   <!-- Modal de alteração de senha -->
-  <div
-    v-if="isChangingPassword"
-    class="password-modal-overlay"
-    @click.self="hidePasswordFields"
-  >
+  <div v-if="isChangingPassword" class="password-modal-overlay" @click.self="hidePasswordFields">
     <div class="password-modal">
       <div class="password-modal-header">
         <h2>Alterar Senha</h2>
@@ -655,9 +658,7 @@ function hidePasswordFields() {
       <div class="feedback-popup-message">
         {{ passwordFeedbackMessage }}
       </div>
-      <button class="feedback-popup-close" @click="closePasswordFeedbackPopup">
-        OK
-      </button>
+      <button class="feedback-popup-close" @click="closePasswordFeedbackPopup">OK</button>
     </div>
   </div>
 </template>
@@ -689,14 +690,15 @@ img {
 }
 
 .info-container {
-  width: 75%;
+  width: 65%;
   min-width: 620px;
-  margin: 5% auto;
+  margin: 3% auto;
   height: auto;
   border-radius: 20px;
   border: 1px solid rgba(180, 180, 180, 0.8);
   box-shadow: -3px 3px 2px 2px rgba(197, 197, 197, 0.726);
   background-color: #fafcff;
+  overflow: hidden;
 }
 
 .info-header {
@@ -735,9 +737,8 @@ img {
   box-shadow: 0 4px 12px rgba(19, 44, 13, 0.3);
 }
 
-/* Grid System Melhorado para User Details */
 .user-details {
-  padding: 60px 55px;
+  padding: 30px 55px;
   display: grid;
   grid-template-columns: minmax(300px, 2fr) minmax(200px, 1fr);
   grid-template-areas:
@@ -750,30 +751,7 @@ img {
   align-items: start;
 }
 
-/* Breakpoints refinados para User Details */
-@media (min-width: 1400px) {
-  .user-details {
-    grid-template-columns: minmax(350px, 2fr) minmax(220px, 1fr);
-    gap: 3rem 4rem;
-    padding: 60px 70px;
-  }
-}
 
-@media (min-width: 1200px) and (max-width: 1399px) {
-  .user-details {
-    grid-template-columns: minmax(320px, 2fr) minmax(200px, 1fr);
-    gap: 2.5rem 3rem;
-    padding: 50px 55px;
-  }
-}
-
-@media (min-width: 993px) and (max-width: 1199px) {
-  .user-details {
-    grid-template-columns: minmax(280px, 2fr) minmax(180px, 1fr);
-    gap: 2rem 2.5rem;
-    padding: 45px 50px;
-  }
-}
 
 .item-nome {
   grid-area: nome;
@@ -820,6 +798,16 @@ img {
   font-size: 16px;
   font-weight: 600;
   text-transform: uppercase;
+  justify-content: center;    
+  align-items: center;       
+  width: 140px;             
+  height: 30px;               
+  border-radius: 20px;       
+  font-size: 0.75rem;        
+  font-weight: 700;          
+  text-transform: uppercase;
+  letter-spacing: 0.5px;    
+  white-space: nowrap;
 }
 
 .access-level-badge.admin {
@@ -1099,7 +1087,6 @@ img {
   cursor: not-allowed;
 }
 
-
 .bntsalvar {
   padding: 8px 25px;
   background-color: rgba(19, 44, 13, 0.8);
@@ -1245,8 +1232,12 @@ img {
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 /* Avatar container */
@@ -1371,4 +1362,5 @@ img {
     font-size: 18px;
   }
 }
+
 </style>

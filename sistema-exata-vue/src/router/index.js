@@ -6,6 +6,7 @@ import ContratoView from '../views/ContratosView.vue'
 import { authService } from '../services/auth'
 import HomePage from '@/views/HomePage.vue'
 import UserInfoPainel from '@/views/UserInfoPainel.vue'
+import ImobMensal from '@/views/ImobMensal.vue'
 // import Header_Principal from '@/views/Header_Principal.vue'
 // import Header_Logout from '@/views/Header_Logout.vue'
 
@@ -16,7 +17,7 @@ const router = createRouter({
     {
       path: '/',
       name: 'login',
-      component: LoginView,
+      component: LoginView  ,
     },
 
     {
@@ -33,13 +34,18 @@ const router = createRouter({
       meta: { requiresAuth: true }
     },
 
-
-
     {
       path: '/contrato',
       name: 'contrato',
       component: ContratoView,
       meta: { requiresAuth: true } // Rota protegida que requer autenticação
+    },
+
+    { 
+    path: '/imobmensal', 
+    name: 'imobmensal',
+    component: ImobMensal,
+    meta: { requiresAuth: true }
     },
 
     {
