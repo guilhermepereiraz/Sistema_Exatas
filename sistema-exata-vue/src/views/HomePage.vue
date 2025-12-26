@@ -30,14 +30,14 @@ async function loadDivisoes() {
   try {
     isLoadingDivisoes.value = true
     console.log('Carregando divisões da API...')
-    
+
     const response = await divisaoApi.getDivisoes()
     console.log('Resposta da API de divisões:', response.data)
-    
+
     // A API pode retornar de diferentes formas:
     // 1. Array direto: [{id: 1, nome: '...'}, ...]
     // 2. Objeto com data: {data: [{id: 1, nome: '...'}, ...]}
-    
+
     if (Array.isArray(response.data)) {
       divisoes.value = response.data
     } else if (response.data.data && Array.isArray(response.data.data)) {
@@ -48,7 +48,7 @@ async function loadDivisoes() {
       console.warn('Formato de resposta inesperado para divisões:', response.data)
       divisoes.value = []
     }
-    
+
     console.log('Divisões carregadas:', divisoes.value.length)
   } catch (error) {
     console.error('Erro ao carregar divisões:', error)
@@ -66,9 +66,9 @@ function irParaAdmin() {
 function irParaContrato(divisaoId = null) {
   // Se divisaoId foi fornecido, passa como query parameter
   if (divisaoId) {
-    router.push({ 
+    router.push({
       name: 'contrato',
-      query: { divisao: divisaoId }
+      query: { divisao: divisaoId },
     })
   } else {
     router.push({ name: 'contrato' })
@@ -78,21 +78,21 @@ function irParaContrato(divisaoId = null) {
 async function handleImobilizacaoClick() {
   const user = authService.getCurrentUser()
   const nivelAcesso = user?.nivel_acesso || 'usuario'
-  
+
   console.log('Nível de acesso do usuário:', nivelAcesso)
-  
+
   // Se for exata ou admin, mostra popup para selecionar divisão
   if (nivelAcesso === 'exata' || nivelAcesso === 'admin') {
-    // Recarrega divisões antes de abrir o popup
-    await loadDivisoes()
+    // --- MUDANÇA AQUI ---
+    // Removemos o 'loadDivisoes()'. Usamos os dados que já carregaram no onMounted.
     showDivisaoPopup.value = true
     divisaoSelecionada.value = null
-  } 
+  }
   // Se for sabesp, vai direto sem popup
   else if (nivelAcesso === 'sabesp') {
     irParaContrato()
   }
-  // Para outros níveis, também vai direto (ou pode mostrar popup também)
+  // Para outros níveis
   else {
     irParaContrato()
   }
@@ -119,9 +119,9 @@ function cancelarDivisao() {
   <div class="home_white">
     <div class="buttons">
       <button class="bnt_imob" @click="handleImobilizacaoClick">Imobilização</button>
-      <button 
-        class="bnt_admin" 
-        :class="{ 'disabled': !isAdmin }"
+      <button
+        class="bnt_admin"
+        :class="{ disabled: !isAdmin }"
         @click="irParaAdmin"
         :disabled="!isAdmin"
         :title="!isAdmin ? 'Acesso restrito a administradores' : 'Painel do Administrador'"
@@ -136,15 +136,16 @@ function cancelarDivisao() {
   <!-- Popup de Seleção de Divisão -->
   <div v-if="showDivisaoPopup" class="modal-overlay" @click.self="cancelarDivisao">
     <div class="modal-content-divisao" @click.stop>
-      <div class="modal-header-divisao">
-        <h2>Selecionar Divisão</h2>
+      <!-- <div class="modal-header-divisao">
+        <h2>Escolha o polo responsável</h2>
         <button @click="cancelarDivisao" class="close-btn-divisao">&times;</button>
-      </div>
+      </div> -->
 
       <div class="modal-body-divisao">
-        <p class="modal-description-divisao">
-          Selecione a divisão para acessar a imobilização:
-        </p>
+        <div class="titulomodaldiv">
+          <h2>Escolha o polo responsável</h2>
+          <p class="modal-description-divisao">Selecione a divisão para acessar a imobilização:</p>
+        </div>
 
         <div v-if="isLoadingDivisoes" class="loading-divisoes">
           <div class="loading-spinner-divisao"></div>
@@ -153,50 +154,38 @@ function cancelarDivisao() {
 
         <div v-else-if="errorMessage" class="error-message-divisao">
           {{ errorMessage }}
-          <button @click="loadDivisoes" class="btn-recarregar-divisoes">
-            🔄 Tentar Novamente
-          </button>
+          <button @click="loadDivisoes" class="btn-recarregar-divisoes">🔄 Tentar Novamente</button>
         </div>
 
         <div v-else-if="divisoes.length === 0" class="no-divisoes">
           <p>Nenhuma divisão disponível.</p>
-          <button @click="loadDivisoes" class="btn-recarregar-divisoes">
-            🔄 Recarregar
-          </button>
+          <button @click="loadDivisoes" class="btn-recarregar-divisoes">🔄 Recarregar</button>
         </div>
 
         <div v-else class="divisao-select-container">
-          <select
-            v-model="divisaoSelecionada"
-            class="divisao-select"
-            :disabled="isLoadingDivisoes"
-          >
+          <select v-model="divisaoSelecionada" class="divisao-select" :disabled="isLoadingDivisoes">
             <option value="" disabled selected>Selecione uma divisão</option>
-            <option
-              v-for="divisao in divisoes"
-              :key="divisao.id"
-              :value="divisao.id"
-            >
+            <option v-for="divisao in divisoes" :key="divisao.id" :value="divisao.id">
               ID: {{ divisao.id }} - {{ divisao.nome }}
             </option>
           </select>
         </div>
 
         <div class="modal-actions-divisao">
-          <button
+          <!-- <button
             type="button"
             @click="cancelarDivisao"
             class="btn-cancelar-divisao"
           >
             Cancelar
-          </button>
+          </button> -->
           <button
             type="button"
             @click="confirmarDivisao"
             class="btn-confirmar-divisao"
             :disabled="!divisaoSelecionada"
           >
-            Confirmar
+            Proxímo
           </button>
         </div>
       </div>
@@ -356,13 +345,14 @@ img {
 
 .modal-content-divisao {
   background: white;
-  border-radius: 12px;
+  border-radius: 20px;
   width: 100%;
-  max-width: 500px;
+  max-width: 700px;
+  height: 50vh;
   max-height: 90vh;
   overflow-y: auto;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-  animation: slideIn 0.3s ease-out;
+  /* animation: slideIn 0.3s ease-out; */
 }
 
 @keyframes slideIn {
@@ -378,7 +368,6 @@ img {
 
 .modal-header-divisao {
   display: flex;
-  justify-content: space-between;
   align-items: center;
   padding: 20px;
   border-bottom: 1px solid #e0e0e0;
@@ -386,9 +375,9 @@ img {
 
 .modal-header-divisao h2 {
   margin: 0;
-  color: #132c0d;
   font-size: 1.5rem;
   font-weight: 600;
+  text-align: center;
 }
 
 .close-btn-divisao {
@@ -414,6 +403,16 @@ img {
 
 .modal-body-divisao {
   padding: 20px;
+}
+
+.titulomodaldiv {
+  text-align: center;
+  margin-bottom: 20px;
+}
+.titulomodaldiv h2 {
+  margin: 10% 0 0 0;
+  font-size: 1.8rem;
+  font-weight: 600;
 }
 
 .modal-description-divisao {
@@ -443,8 +442,12 @@ img {
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .no-divisoes {
@@ -487,7 +490,9 @@ img {
 }
 
 .divisao-select {
-  width: 100%;
+  width: 60%;
+  margin: 5% 0 0 0;
+  margin-left: 20%;
   padding: 12px;
   border: 2px solid #e0e0e0;
   border-radius: 8px;
@@ -529,13 +534,15 @@ img {
 .modal-actions-divisao {
   display: flex;
   gap: 12px;
-  justify-content: flex-end;
+  justify-content: center;
   margin-top: 24px;
 }
 
 .btn-cancelar-divisao,
 .btn-confirmar-divisao {
-  padding: 12px 24px;
+  margin-top: 10%;
+  padding: 15px 24px;
+  width: 60%;
   border: none;
   border-radius: 6px;
   font-size: 14px;

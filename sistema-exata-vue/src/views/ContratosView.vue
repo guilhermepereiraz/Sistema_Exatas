@@ -3,7 +3,7 @@ import { ref, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { authService } from '../services/auth'
 // 1. Importa a API de contratos
-import { contratoApi } from '../services/api'
+import { contratoPepApi } from '../services/api'
 import HeaderNoHR from './Header_no_HR.vue'
 import PopupLoadView from './PopupLoadView.vue'
 
@@ -84,7 +84,7 @@ async function loadContratos(page = 1) {
     }
 
     console.log('Carregando contratos com filtros:', filters)
-    const response = await contratoApi.getContratos(page, 10, filters)
+    const response = await contratoPepApi.getContratoPeps(page, 10, filters)
 
     // Laravel Paginator response structure (ContratoCollection)
     if (response.data) {
@@ -312,6 +312,11 @@ function formatDate(dateString) {
     return dateString // Retorna a string original se falhar
   }
 }
+
+function formatMoney(value) {
+  if (!value) return 'R$ 0,00'
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
+}
 </script>
 
 <template>
@@ -335,14 +340,33 @@ function formatDate(dateString) {
         </button>
       </div>
 
-      <!-- Indicador de Filtro de Divisão -->
-      <div v-if="divisaoFiltro" class="filtro-divisao-badge">
-        <span class="filtro-label">Filtrando por:</span>
-        <span class="filtro-divisao-nome">{{ nomeDivisao }}</span>
-        <button @click="removerFiltroDivisao" class="btn-remover-filtro" title="Remover filtro">
-          ✕
-        </button>
-      </div>
+      <Transition name="slide-fade">
+        <div v-if="divisaoFiltro" class="floating-filter-badge">
+          <div class="filter-content">
+            <span class="filter-icon">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+              </svg>
+            </span>
+            <span class="filter-text">
+              Filtro: <strong>{{ nomeDivisao }}</strong>
+            </span>
+            <button @click="removerFiltroDivisao" class="btn-close-filter" title="Remover filtro">
+              ✕
+            </button>
+          </div>
+        </div>
+      </Transition>
 
       <div class="admin-card">
         <div class="users-section">
@@ -369,35 +393,28 @@ function formatDate(dateString) {
             <table v-else class="users-table">
               <thead>
                 <tr>
-                  <th style="text-align: center">Código Contrato</th>
-                  <th style="text-align: center">Divisão</th>
-                  <th style="text-align: center">Referência</th>
-                  <th style="text-align: center">Centro Custo</th>
-                  <th style="text-align: center">Administrador</th>
-                  <th style="text-align: center">Fornecedor</th>
-                  <th style="text-align: center">Descrição</th>
-                  <th style="text-align: center">Data Término</th>
-                  <th style="text-align: center">Status</th>
-                  <!-- <th style="text-align: center">Ações</th> -->
+                  <th style="text-align: center; width: 5%">PEP</th>
+                  <th style="text-align: center; width: 8%">IEA</th>
+                  <th style="text-align: center; width: 8%">Divisão</th>
+                  <th style="text-align: center; width: 8%">Término</th>
+                  <th style="text-align: center; width: 10%">Concluído</th>
+                  <th style="text-align: center; width: 10%">Adm</th>
+                  <th style="text-align: center; width: 10%">Fornecedor</th>
+                  <th style="text-align: center; width: 8%">Referência</th>
+                  <th style="text-align: center; width: 8%">Contrato</th>
+
+                  <th style="text-align: center; width: 15%">Descrição</th>
+                  <th style="text-align: center; width: 10%">Obs</th>
+
+                  <th style="text-align: center; width: 10%">Valor Contábil</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="contrato in contratos" :key="contrato.codigo_contrato">
-                  <td>{{ contrato.codigo_contrato || '-' }}</td>
-
+                <tr v-for="contrato in contratos" :key="contrato.id">
+                  <td>{{ contrato.pep_id || '-' }}</td>
+                  <td>{{ contrato.IEA || '-' }}</td>
                   <td>{{ contrato.divisao_id || '-' }}</td>
-
-                  <td>{{ contrato.referencia || '-' }}</td>
-
-                  <td>{{ contrato.centro_custo || '-' }}</td>
-
-                  <td>{{ contrato.administrador || '-' }}</td>
-
-                  <td>{{ contrato.fornecedor || '-' }}</td>
-
-                  <td>{{ contrato.descricao || '-' }}</td>
-
-                  <td>{{ formatDate(contrato.data_termino) }}</td>
+                  <td>{{ formatDate(contrato.termino) }}</td>
 
                   <td>
                     <span class="status" :class="getStatusLabel(contrato.concluido)">
@@ -405,63 +422,25 @@ function formatDate(dateString) {
                     </span>
                   </td>
 
-                  <!-- <td class="acoes-col">
-                    <button
-                      class="btn-upload-contrato"
-                      @click="abrirUploadContrato(contrato)"
-                      :disabled="isUploadingContrato"
-                    >
-                      Atualizar contrato
-                    </button>
-                  </td> -->
+                  <td>{{ contrato.administrador || '-' }}</td>
+                  <td>{{ contrato.fornecedor || '-' }}</td>
+                  <td>{{ contrato.referencia || '-' }}</td>
+                  <td>
+                    <strong>{{ contrato.codigo_contrato || '-' }}</strong>
+                  </td>
+
+                  <td class="col-desc" :title="contrato.descricao">
+                    <div class="text-clamp">{{ contrato.descricao || '-' }}</div>
+                  </td>
+
+                  <td class="col-obs" :title="contrato.observacao">
+                    <div class="text-clamp">{{ contrato.observacao || '-' }}</div>
+                  </td>
+
+                  <td style="white-space: nowrap">{{ formatMoney(contrato.valor_contabil) }}</td>
                 </tr>
               </tbody>
             </table>
-
-            <!-- Controles de Paginação -->
-            <div v-if="!isLoadingContratos && contratos.length > 0" class="pagination-container">
-              <div class="pagination-info">
-                <span>
-                  Mostrando {{ getContratosRange().start }} a {{ getContratosRange().end }} de
-                  {{ totalContratos }} contrato{{ totalContratos !== 1 ? 's' : '' }}
-                </span>
-              </div>
-
-              <div class="pagination-controls">
-                <button
-                  @click="goToPage(currentPage - 1)"
-                  :disabled="currentPage === 1 || isLoadingContratos"
-                  class="pagination-btn"
-                  title="Página anterior"
-                >
-                  ← Anterior
-                </button>
-
-                <div class="pagination-pages">
-                  <button
-                    v-for="page in getPageNumbers()"
-                    :key="page"
-                    @click="goToPage(page)"
-                    :disabled="isLoadingContratos"
-                    :class="[
-                      'pagination-page-btn',
-                      { active: page === currentPage, ellipsis: page === '...' },
-                    ]"
-                  >
-                    {{ page }}
-                  </button>
-                </div>
-
-                <button
-                  @click="goToPage(currentPage + 1)"
-                  :disabled="currentPage >= totalPages || isLoadingContratos || totalPages <= 1"
-                  class="pagination-btn"
-                  title="Próxima página"
-                >
-                  Próxima →
-                </button>
-              </div>
-            </div>
 
             <div
               v-if="!isLoadingContratos && contratos.length === 0 && !errorMessage"
@@ -475,18 +454,49 @@ function formatDate(dateString) {
           </div>
         </div>
       </div>
+      <!-- Controles de Paginação -->
+      <div v-if="!isLoadingContratos && contratos.length > 0" class="pagination-container">
+        <div class="pagination-info">
+          <span>
+            Mostrando {{ getContratosRange().start }} a {{ getContratosRange().end }} de
+            {{ totalContratos }} contrato{{ totalContratos !== 1 ? 's' : '' }}
+          </span>
+        </div>
 
-      <div
-        v-if="!isLoadingContratos && contratos.length > 0 && totalPages > 1"
-        class="bottom-next-container"
-      >
-        <button
-          class="bottom-next-btn"
-          @click="goToPage(currentPage + 1)"
-          :disabled="currentPage >= totalPages"
-        >
-          Próxima →
-        </button>
+        <div class="pagination-controls">
+          <button
+            @click="goToPage(currentPage - 1)"
+            :disabled="currentPage === 1 || isLoadingContratos"
+            class="pagination-btn"
+            title="Página anterior"
+          >
+            ← Anterior
+          </button>
+
+          <div class="pagination-pages">
+            <button
+              v-for="page in getPageNumbers()"
+              :key="page"
+              @click="goToPage(page)"
+              :disabled="isLoadingContratos"
+              :class="[
+                'pagination-page-btn',
+                { active: page === currentPage, ellipsis: page === '...' },
+              ]"
+            >
+              {{ page }}
+            </button>
+          </div>
+
+          <button
+            @click="goToPage(currentPage + 1)"
+            :disabled="currentPage >= totalPages || isLoadingContratos || totalPages <= 1"
+            class="pagination-btn"
+            title="Próxima página"
+          >
+            Próxima →
+          </button>
+        </div>
       </div>
 
       <div class="div_proximo">
@@ -536,6 +546,7 @@ td {
   margin: 0 auto;
   box-sizing: border-box; /* ESSENCIAL: Faz o padding contar DENTRO da largura */
   overflow: hidden;
+  position: relative;
 }
 
 .admin-card {
@@ -551,6 +562,83 @@ td {
   font-size: 2rem;
   text-align: center;
   margin-top: -15px;
+}
+
+.floating-filter-badge {
+  position: absolute;
+  top: 1.5rem; /* Alinhado com a altura do Título */
+  right: 2rem; /* Canto direito */
+  z-index: 50; /* Fica acima de tudo */
+}
+
+.filter-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: white;
+  padding: 8px 16px;
+  border-radius: 30px; /* Formato de Pílula */
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08); /* Sombra suave */
+  border: 1px solid rgba(19, 44, 13, 0.2); /* Borda verde bem sutil */
+  backdrop-filter: blur(5px); /* Efeito moderno se tiver fundo */
+  transition: all 0.3s ease;
+}
+
+.filter-content:hover {
+  box-shadow: 0 6px 20px rgba(19, 44, 13, 0.15);
+  border-color: rgba(19, 44, 13, 0.5);
+  transform: translateY(-1px);
+}
+
+.filter-icon {
+  color: #132c0d;
+  display: flex;
+  align-items: center;
+}
+
+.filter-text {
+  font-size: 0.9rem;
+  color: #555;
+  white-space: nowrap;
+}
+
+.filter-text strong {
+  color: #132c0d;
+  font-weight: 700;
+}
+
+.btn-close-filter {
+  background: rgba(19, 44, 13, 0.1);
+  color: #132c0d;
+  border: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-left: 5px;
+}
+
+.btn-close-filter:hover {
+  background: #c62828;
+  color: white;
+  transform: scale(1.1);
+}
+
+/* --- ANIMAÇÃO DE ENTRADA/SAÍDA --- */
+.slide-fade-enter-active,
+.slide-fade-leave-active {
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.slide-fade-enter-from,
+.slide-fade-leave-to {
+  transform: translateY(-10px); /* Vem de cima */
+  opacity: 0;
 }
 
 /* Badge de Filtro de Divisão */
@@ -642,7 +730,8 @@ td {
 .table-container {
   overflow-x: auto; /* Permite scroll horizontal */
   overflow-y: auto;
-  max-height: 65vh; /* Reduzido para 60vh para evitar scroll da página */
+  height: 58vh;
+  max-height: 58vh; /* Reduzido para 60vh para evitar scroll da página */
   border-radius: 8px;
   border: 1px solid #e0e0e0;
 }
@@ -736,8 +825,9 @@ td {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: 3rem;
+  justify-content: center; /* Centraliza verticalmente */
+  height: 100%; /* Ocupa toda a altura do container pai */
+  min-height: 200px; /* Garante um tamanho mínimo se o pai for pequeno */
   color: #666;
 }
 
@@ -765,9 +855,8 @@ td {
   display: flex;
   flex-direction: column;
   gap: 1rem;
-  margin-top: 1.5rem;
   padding: 1rem;
-  background-color: #f9f9f9;
+  padding: 10px;
   border-radius: 8px;
   border-top: 2px solid #e0e0e0;
 }
@@ -951,7 +1040,6 @@ td {
 }
 .div_proximo {
   text-align: center;
-  margin-top: 20px;
 }
 .bnt_proximo {
   width: 150px;
@@ -968,5 +1056,44 @@ td {
 .bnt_proximo:hover {
   background-color: #0f2410;
   transform: translateY(-1px);
+}
+
+/* --- CSS PARA CONTROLAR A LARGURA E O TEXTO --- */
+
+/* Define larguras máximas para as colunas problemáticas */
+.col-desc {
+  max-width: 200px; /* Ajuste conforme necessário */
+}
+
+.col-obs {
+  max-width: 150px; /* Ajuste conforme necessário */
+}
+
+/* CLASSE MÁGICA: Corta o texto após 2 linhas */
+.text-clamp {
+  display: -webkit-box;
+  -webkit-line-clamp: 2; /* Número máximo de linhas antes de cortar */
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: normal; /* Permite quebrar linha dentro do limite */
+  line-height: 1.2; /* Altura da linha para ficar compacto */
+  font-size: 0.85rem;
+  color: #555;
+  text-align: center; /* Ou left, se preferir */
+}
+
+/* Ajuste fino na tabela para evitar scroll horizontal na página */
+.users-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  table-layout: fixed; /* IMPORTANTE: Tenta forçar a tabela a caber na largura disponível */
+  min-width: 100%; /* Remove min-width gigante que causava scroll */
+}
+
+.users-table th,
+.users-table td {
+  overflow: hidden; /* Garante que nada vaze da célula */
 }
 </style>

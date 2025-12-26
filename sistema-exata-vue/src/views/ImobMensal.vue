@@ -63,7 +63,9 @@ function adicionarParaTabela() {
     return
   }
 
-  const jaExiste = contratosAdicionados.value.find((c) => c.id === contratoSelecionadoTemp.value.id)
+  const jaExiste = contratosAdicionados.value.find(
+    (c) => c.codigo_contrato === contratoSelecionadoTemp.value.codigo_contrato
+  )
 
   if (jaExiste) {
     alert('Este contrato já foi adicionado à tabela.')
@@ -162,7 +164,7 @@ function removerItem(index) {
       <div class="table-container">
         <table class="custom-table">
           <thead>
-            <tr>
+            <tr class="trtable">
               <th>Referência</th>
               <th>Contrato</th>
               <th>Desc. Contrato</th>
@@ -463,16 +465,8 @@ function removerItem(index) {
   background-color: #fef2f2;
 }
 
-.table-container::-webkit-scrollbar {
-  height: 8px;
-}
-.table-container::-webkit-scrollbar-track {
-  background: transparent;
-}
-.table-container::-webkit-scrollbar-thumb {
-  background-color: rgba(19, 44, 13, 0.3);
-  border-radius: 4px;
-}
+
+
 .tdobs {
   text-align: center;
   padding: 10px;
@@ -567,14 +561,6 @@ function removerItem(index) {
   text-align: center;
 }
 
-.dropdown-list::-webkit-scrollbar {
-  width: 6px;
-}
-.dropdown-list::-webkit-scrollbar-thumb {
-  background-color: rgba(19, 44, 13, 0.3);
-  border-radius: 4px;
-}
-
 .empty-table-cell {
   height: 55vh;
   vertical-align: middle;
@@ -622,6 +608,22 @@ function removerItem(index) {
 .arrow-down {
   font-size: 0.6rem;
   color: #666;
+}
+
+/* Cabeçalho Verde */
+.custom-table th {
+  color: white;
+  padding: 1rem;
+  text-align: center;
+  font-weight: 600;
+  border-bottom: 2px solid #e0e0e0;
+  white-space: nowrap;
+
+  /* --- O TRUQUE PARA FIXAR --- */
+  position: sticky;
+  top: 0;
+  z-index: 100; /* Garante que fique por cima do conteúdo */
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1); /* Sombra suave para destacar */
 }
 
 .custom-options {
