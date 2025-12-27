@@ -32,7 +32,7 @@
 
         <!-- Botões de ação -->
         <div class="admin-buttons">
-            <button @click="atualizarContratos" class="admin-btn">
+          <button @click="atualizarContratos" class="admin-btn">
             <span class="btn-icon"></span>
             Atualizar Contratos
           </button>
@@ -65,12 +65,12 @@
             <table v-else class="users-table">
               <thead>
                 <tr>
-                  <th style="text-align: center;">Nome Completo</th>
-                  <th style="text-align: center;">Email</th>
-                  <th style="text-align: center;">Nível de Acesso</th>
-                  <th style="text-align: center;">Divisão</th>
-                  <th style="text-align: center;">Editar</th>
-                  <th style="text-align: center;">Excluir</th>
+                  <th style="text-align: center">Nome Completo</th>
+                  <th style="text-align: center">Email</th>
+                  <th style="text-align: center">Nível de Acesso</th>
+                  <th style="text-align: center">Divisão</th>
+                  <th style="text-align: center">Editar</th>
+                  <th style="text-align: center">Excluir</th>
                 </tr>
               </thead>
               <tbody>
@@ -101,56 +101,6 @@
               </tbody>
             </table>
 
-            <!-- Controles de Paginação -->
-            <div v-if="!isLoadingUsers && users.length > 0" class="pagination-container">
-              <div class="pagination-info">
-                <span>
-                  Mostrando {{ getUsersRange().start }} a {{ getUsersRange().end }} de
-                  {{ totalUsers }} usuário{{ totalUsers !== 1 ? 's' : '' }}
-                </span>
-                <!-- Debug info (remover depois) -->
-                <div style="font-size: 0.75rem; color: #999; margin-top: 0.25rem">
-                  Página {{ currentPage }} de {{ totalPages }} | Botão desabilitado:
-                  {{ currentPage >= totalPages || isLoadingUsers ? 'Sim' : 'Não' }}
-                </div>
-              </div>
-
-              <div class="pagination-controls">
-                <button
-                  @click="goToPage(currentPage - 1)"
-                  :disabled="currentPage === 1 || isLoadingUsers"
-                  class="pagination-btn"
-                  title="Página anterior"
-                >
-                  ← Anterior
-                </button>
-
-                <div class="pagination-pages">
-                  <button
-                    v-for="page in getPageNumbers()"
-                    :key="page"
-                    @click="goToPage(page)"
-                    :disabled="isLoadingUsers"
-                    :class="[
-                      'pagination-page-btn',
-                      { active: page === currentPage, ellipsis: page === '...' },
-                    ]"
-                  >
-                    {{ page }}
-                  </button>
-                </div>
-
-                <button
-                  @click="goToPage(currentPage + 1)"
-                  :disabled="currentPage >= totalPages || isLoadingUsers"
-                  class="pagination-btn"
-                  :title="`Próxima página (${currentPage + 1} de ${totalPages})`"
-                >
-                  Próxima →
-                </button>
-              </div>
-            </div>
-
             <div v-if="!isLoadingUsers && users.length === 0" class="no-users">
               <div class="no-users-content">
                 <h4>Nenhum usuário cadastrado</h4>
@@ -172,6 +122,56 @@
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- Controles de Paginação -->
+      <div v-if="!isLoadingUsers && users.length > 0" class="pagination-container">
+        <div class="pagination-info">
+          <span>
+            Mostrando {{ getUsersRange().start }} a {{ getUsersRange().end }} de
+            {{ totalUsers }} usuário{{ totalUsers !== 1 ? 's' : '' }}
+          </span>
+          <!-- Debug info (remover depois) -->
+          <div style="font-size: 0.75rem; color: #999; margin-top: 0.25rem">
+            Página {{ currentPage }} de {{ totalPages }} | Botão desabilitado:
+            {{ currentPage >= totalPages || isLoadingUsers ? 'Sim' : 'Não' }}
+          </div>
+        </div>
+
+        <div class="pagination-controls">
+          <button
+            @click="goToPage(currentPage - 1)"
+            :disabled="currentPage === 1 || isLoadingUsers"
+            class="pagination-btn"
+            title="Página anterior"
+          >
+            ← Anterior
+          </button>
+
+          <div class="pagination-pages">
+            <button
+              v-for="page in getPageNumbers()"
+              :key="page"
+              @click="goToPage(page)"
+              :disabled="isLoadingUsers"
+              :class="[
+                'pagination-page-btn',
+                { active: page === currentPage, ellipsis: page === '...' },
+              ]"
+            >
+              {{ page }}
+            </button>
+          </div>
+
+          <button
+            @click="goToPage(currentPage + 1)"
+            :disabled="currentPage >= totalPages || isLoadingUsers"
+            class="pagination-btn"
+            :title="`Próxima página (${currentPage + 1} de ${totalPages})`"
+          >
+            Próxima →
+          </button>
         </div>
       </div>
     </main>
@@ -1240,7 +1240,7 @@ th {
 .table-container {
   overflow-x: auto;
   overflow-y: auto;
-  max-height: 63vh;
+  max-height: 54vh;
   border-radius: 8px;
   border: 1px solid #e0e0e0;
   /* Melhorias de scroll */
@@ -1309,17 +1309,17 @@ th {
 }
 
 .access-level {
-display: inline-flex;      
-  justify-content: center;    
-  align-items: center;       
-  width: 140px;             
-  height: 30px;               
-  padding: 0;                
-  border-radius: 20px;       
-  font-size: 0.75rem;        
-  font-weight: 700;          
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  width: 140px;
+  height: 30px;
+  padding: 0;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.5px;    
+  letter-spacing: 0.5px;
   white-space: nowrap;
 }
 
@@ -1376,9 +1376,8 @@ display: inline-flex;
   display: flex;
   flex-direction: column;
   gap: 1rem;
-  margin-top: 1.5rem;
   padding: 1rem;
-  background-color: #f9f9f9;
+  padding: 10px;
   border-radius: 8px;
   border-top: 2px solid #e0e0e0;
 }
@@ -1628,7 +1627,7 @@ display: inline-flex;
   font-size: 1.5rem;
   cursor: pointer;
   color: black;
-  padding:0.1rem 0.6rem 0.2rem 0.6rem;
+  padding: 0.1rem 0.6rem 0.2rem 0.6rem;
   border-radius: 30px;
   transition: background-color 0.3s ease;
   margin-right: 15px;
@@ -2031,8 +2030,6 @@ display: inline-flex;
     font-size: 1rem;
   }
 }
-
-
 
 /* Telas Médias (tablets) - a partir de 1024px para baixo */
 @media (max-width: 1024px) {

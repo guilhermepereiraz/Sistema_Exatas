@@ -14,6 +14,31 @@ const mostrarLista = ref(false)
 const contratosAdicionados = ref([])
 const contratoSelecionadoTemp = ref(null)
 
+const isDeleteModalOpen = ref(false)
+const itemToDelete = ref(null)
+const itemToDeleteIndex = ref(null)
+
+function removerItem(index) {
+  itemToDeleteIndex.value = index
+  itemToDelete.value = contratosAdicionados.value[index]
+  isDeleteModalOpen.value = true
+}
+
+// 2. Ao confirmar no modal (Apaga de verdade)
+function confirmarExclusao() {
+  if (itemToDeleteIndex.value !== null) {
+    contratosAdicionados.value.splice(itemToDeleteIndex.value, 1)
+  }
+  fecharModalExclusao()
+}
+
+// 3. Ao cancelar ou fechar
+function fecharModalExclusao() {
+  isDeleteModalOpen.value = false
+  itemToDelete.value = null
+  itemToDeleteIndex.value = null
+}
+
 onMounted(async () => {
   try {
     // Busca a lista de contratos
@@ -64,7 +89,7 @@ function adicionarParaTabela() {
   }
 
   const jaExiste = contratosAdicionados.value.find(
-    (c) => c.codigo_contrato === contratoSelecionadoTemp.value.codigo_contrato
+    (c) => c.codigo_contrato === contratoSelecionadoTemp.value.codigo_contrato,
   )
 
   if (jaExiste) {
@@ -112,13 +137,32 @@ function formatMoney(value) {
   // Assume que vem como string ou numero. Ajuste conforme sua API.
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
 }
-
-function removerItem(index) {
-  contratosAdicionados.value.splice(index, 1)
-}
 </script>
 <template>
   <Header_no_HR />
+
+  <div class="confirmation-backdrop" v-if="isDeleteModalOpen" @click="fecharModalExclusao">
+    <div class="confirmation-window" @click.stop>
+      <div class="confirmation-heading">
+        <h1>Tem certeza que deseja <br> excluir esse contrato da sua <br> lista?</h1>
+      </div>
+
+      <div>
+        <span class="target-user-display">
+          ({{ itemToDelete ? itemToDelete.codigo_contrato : 'contrato' }})
+        </span>
+      </div>
+
+      <div class="confirmation-text">
+        <p>O contrato NÃO será excluir do banco de dados</p>
+      </div>
+
+      <div class="confirmation-actions">
+        <button class="action-button action-cancel" @click="fecharModalExclusao">Não</button>
+        <button class="action-button action-confirm" @click="confirmarExclusao">Sim</button>
+      </div>
+    </div>
+  </div>
 
   <div class="div_main">
     <div class="div_select">
@@ -465,8 +509,6 @@ function removerItem(index) {
   background-color: #fef2f2;
 }
 
-
-
 .tdobs {
   text-align: center;
   padding: 10px;
@@ -623,7 +665,7 @@ function removerItem(index) {
   position: sticky;
   top: 0;
   z-index: 100; /* Garante que fique por cima do conteúdo */
-  box-shadow: 0 2px 5px rgba(0,0,0,0.1); /* Sombra suave para destacar */
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); /* Sombra suave para destacar */
 }
 
 .custom-options {
@@ -672,5 +714,113 @@ function removerItem(index) {
 }
 .option-item.proximo .dot {
   color: #ef6c00;
+}
+
+/* --- ESTILOS DO MODAL DE CONFIRMAÇÃO --- */
+.confirmation-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000; /* Alto z-index para ficar por cima de tudo */
+  padding: 1rem;
+}
+
+.confirmation-window {
+  background-color: white;
+  padding: 2.5rem;
+  border-radius: 20px;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+  width: 90%;
+  max-width: 700px;
+  height: 90%;
+  max-height: 500px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 1.5rem;
+}
+.confirmation-heading h1 {
+  font-size: 2.2rem;
+  font-weight: 700;
+  color: #222;
+  margin: 0;
+  line-height: 1.3;
+  margin-top: 20%;
+}
+
+.target-user-display {
+  display: inline-block;
+  background-color: #eeeeee;
+  color: #555;
+  padding: 0.25rem 0.75rem;
+  border-radius: 16px;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.confirmation-text p {
+  font-size: 1.1rem;
+  color: #444;
+  margin: 0;
+}
+
+.confirmation-text strong {
+  color: #000;
+  font-weight: 700;
+}
+
+.confirmation-actions {
+  display: flex;
+  gap: 1rem;
+  width: 100%;
+  margin-top: 0rem;
+}
+
+.action-button {
+  flex-grow: 1;
+  padding: 0.8rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  border: 2px solid;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-top: 2%;
+}
+
+.action-cancel {
+  background-color: rgba(19, 44, 13, 0.8);
+  color: white;
+  font-size: 20px;
+  border: 1px solid black;
+  border-radius: 10px;
+  background-color: rgba(19, 44, 13, 0.8);
+}
+
+.action-cancel:hover {
+  background-color: #2e6931;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(19, 44, 13, 0.8);
+}
+
+.action-confirm {
+  background-color: #b83a3a;
+  border: 1px solid black;
+  border-radius: 10px;
+  background-color: rgba(139, 14, 14, 0.8);
+  color: white;
+}
+
+.action-confirm:hover {
+  background-color: rgba(209, 44, 44, 0.8);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(139, 14, 14, 0.8);
 }
 </style>

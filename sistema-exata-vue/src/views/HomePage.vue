@@ -350,7 +350,7 @@ img {
   max-width: 700px;
   height: 50vh;
   max-height: 90vh;
-  overflow-y: auto;
+  overflow-y: hidden;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
   /* animation: slideIn 0.3s ease-out; */
 }
