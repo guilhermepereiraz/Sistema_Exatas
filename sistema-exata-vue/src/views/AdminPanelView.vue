@@ -1,355 +1,3 @@
-<template>
-  <div class="admin-panel">
-    <HeaderNoHR />
-
-    <div class="confirmation-backdrop" v-if="isDeleteUser" @click="closeDeleteModalUser">
-      <div class="confirmation-window">
-        <div class="confirmation-heading">
-          <h1>Tem certeza que deseja<br />excluir o usuário?</h1>
-        </div>
-
-        <div>
-          <span class="target-user-display"
-            >({{ userToDelete ? userToDelete.name : 'usuário' }})</span
-          >
-        </div>
-
-        <div class="confirmation-text">
-          <p>O usuário <strong>SERÁ</strong> excluído do banco de dados.</p>
-        </div>
-
-        <div class="confirmation-actions">
-          <button class="action-button action-cancel" @click="closeDeleteModalUser">Não</button>
-          <button class="action-button action-confirm" @click="confirmDeleteUser">Sim</button>
-        </div>
-      </div>
-    </div>
-
-    <main class="admin-content">
-      <div class="admin-card">
-        <!-- <h2>Painel do Administrador</h2>
-        <p>Gerencie usuários e funcionalidades do sistema</p> -->
-
-        <!-- Botões de ação -->
-        <div class="admin-buttons">
-          <button @click="atualizarContratos" class="admin-btn">
-            <span class="btn-icon"></span>
-            Atualizar Contratos
-          </button>
-          <button @click="atualizarCJI3" class="admin-btn">
-            <span class="btn-icon"></span>
-            Atualizar CJI3
-          </button>
-          <button @click="atualizarCadastro" class="admin-btn">
-            <span class="btn-icon"></span>
-            Atualizar Cadastro
-          </button>
-          <button @click="atualizarDenominacao" class="admin-btn">
-            <span class="btn-icon"></span>
-            Arquivos Denominação
-          </button>
-          <button @click="showUserForm = true" class="admin-btn">
-            <span class="btn-icon"></span>
-            Novo Usuário
-          </button>
-        </div>
-
-        <!-- Tabela de usuários -->
-        <div class="users-section">
-          <div class="users-header"></div>
-          <div class="table-container">
-            <div v-if="isLoadingUsers" class="loading-users">
-              <div class="loading-spinner"></div>
-              <span>Carregando usuários...</span>
-            </div>
-            <table v-else class="users-table">
-              <thead>
-                <tr>
-                  <th style="text-align: center">Nome Completo</th>
-                  <th style="text-align: center">Email</th>
-                  <th style="text-align: center">Nível de Acesso</th>
-                  <th style="text-align: center">Divisão</th>
-                  <th style="text-align: center">Editar</th>
-                  <th style="text-align: center">Excluir</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="user in users" :key="user.id">
-                  <td>{{ user.name }}</td>
-                  <td>{{ user.email }}</td>
-                  <td>
-                    <span class="access-level" :class="user.nivel_acesso">
-                      {{ getAccessLevelLabel(user.nivel_acesso) }}
-                    </span>
-                  </td>
-                  <td>{{ user.divisao_id || '-' }}</td>
-                  <td class="actions">
-                    <button @click="editUser(user)" class="action-btn edit-btn" title="Editar">
-                      <IconEdit />
-                    </button>
-                  </td>
-                  <td>
-                    <button
-                      @click="promptDeleteUser(user)"
-                      class="action-btn delete-btn"
-                      title="Excluir"
-                    >
-                      <IconDelete />
-                    </button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-
-            <div v-if="!isLoadingUsers && users.length === 0" class="no-users">
-              <div class="no-users-content">
-                <h4>Nenhum usuário cadastrado</h4>
-                <p>Verifique se:</p>
-                <ul>
-                  <li>O backend Laravel está rodando em <code>http://127.0.0.1:8000</code></li>
-                  <li>O endpoint <code>/api/v1/users</code> está funcionando</li>
-                  <li>Existem usuários cadastrados no banco de dados</li>
-                  <li>Você está autenticado (token válido)</li>
-                </ul>
-                <div class="test-buttons">
-                  <button @click="testApiConnection" class="test-api-btn">
-                    🔍 Testar Conexão com API
-                  </button>
-                  <button @click="testUserRegistration" class="test-api-btn">
-                    👤 Testar Cadastro de Usuário
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Controles de Paginação -->
-      <div v-if="!isLoadingUsers && users.length > 0" class="pagination-container">
-        <div class="pagination-info">
-          <span>
-            Mostrando {{ getUsersRange().start }} a {{ getUsersRange().end }} de
-            {{ totalUsers }} usuário{{ totalUsers !== 1 ? 's' : '' }}
-          </span>
-          <!-- Debug info (remover depois) -->
-          <div style="font-size: 0.75rem; color: #999; margin-top: 0.25rem">
-            Página {{ currentPage }} de {{ totalPages }} | Botão desabilitado:
-            {{ currentPage >= totalPages || isLoadingUsers ? 'Sim' : 'Não' }}
-          </div>
-        </div>
-
-        <div class="pagination-controls">
-          <button
-            @click="goToPage(currentPage - 1)"
-            :disabled="currentPage === 1 || isLoadingUsers"
-            class="pagination-btn"
-            title="Página anterior"
-          >
-            ← Anterior
-          </button>
-
-          <div class="pagination-pages">
-            <button
-              v-for="page in getPageNumbers()"
-              :key="page"
-              @click="goToPage(page)"
-              :disabled="isLoadingUsers"
-              :class="[
-                'pagination-page-btn',
-                { active: page === currentPage, ellipsis: page === '...' },
-              ]"
-            >
-              {{ page }}
-            </button>
-          </div>
-
-          <button
-            @click="goToPage(currentPage + 1)"
-            :disabled="currentPage >= totalPages || isLoadingUsers"
-            class="pagination-btn"
-            :title="`Próxima página (${currentPage + 1} de ${totalPages})`"
-          >
-            Próxima →
-          </button>
-        </div>
-      </div>
-    </main>
-
-    <PopupLoadView
-      v-if="showDenominacaoPopup"
-      title="Carregar Denominação"
-      @close="showDenominacaoPopup = false"
-    />
-
-    <PopupLoadView
-      v-if="showCadastroQauntPopup"
-      title="Carregar Quantitativo Cadastro"
-      @close="showCadastroQauntPopup = false"
-    />
-
-    <PopupLoadView
-      v-if="showContratosPopup"
-      title="Carregar Contratos"
-      @close="showContratosPopup = false"
-    />
-
-    <PopupLoadView v-if="showCji3Popup" title="Carregar CJI3" @close="showCji3Popup = false" />
-
-    <PopupLoadView
-      v-if="showPepsPopup"
-      title="Carregar CJI3"
-      @close="showPepsPopup = false"
-      @upload="handlePepsUpload"
-    />
-
-    <!-- Popup de Feedback (Sucesso/Erro) -->
-    <div v-if="showFeedbackPopup" class="feedback-popup-overlay" @click.self="closeFeedbackPopup">
-      <div class="feedback-popup-content" :class="feedbackType" @click.stop>
-        <div class="feedback-popup-icon">
-          <span v-if="feedbackType === 'success'">✅</span>
-          <span v-else>❌</span>
-        </div>
-        <div class="feedback-popup-message">
-          {{ feedbackMessage }}
-        </div>
-        <button @click="closeFeedbackPopup" class="feedback-popup-close">OK</button>
-      </div>
-    </div>
-
-    <!-- Modal de formulário de usuário -->
-    <div v-if="showUserForm" class="modal-overlay" @click="closeUserForm">
-      <div class="modal-content" @click.stop>
-        <div class="modal-header">
-          <h3>{{ editingUser ? 'Informações do Usuário' : 'Informações do Novo Usuário' }}</h3>
-          <button @click="closeUserForm" class="close-btn">&times;</button>
-        </div>
-        <hr class="modal-hr" />
-
-        <form @submit.prevent="saveUser" class="user-form">
-          <div class="form-group">
-            <label for="name">Nome Completo:</label>
-            <input
-              type="text"
-              id="name"
-              v-model="formData.name"
-              required
-              :disabled="isLoading"
-              placeholder="Nome do Colaborador"
-            />
-          </div>
-
-          <div class="form-group">
-            <label for="email">E-mail:</label>
-            <input
-              type="email"
-              id="email"
-              v-model="formData.email"
-              required
-              :disabled="isLoading"
-              placeholder="E-mail de acesso do colaborador"
-            />
-          </div>
-
-          <div class="form-group">
-            <label for="password">Senha:</label>
-            <input
-              type="password"
-              id="password"
-              v-model="formData.password"
-              :required="!editingUser"
-              :disabled="isLoading"
-              placeholder="Mínimo de 8 caracteres, com letras e números."
-            />
-            <!-- <small v-if="editingUser" class="form-help">
-              Deixe em branco para manter a senha atual</small> -->
-          </div>
-
-          <div class="form-group">
-            <label for="password_confirmation">Confirmar Senha:</label>
-            <input
-              type="password"
-              id="password_confirmation"
-              v-model="formData.password_confirmation"
-              :required="!editingUser || (editingUser && formData.password)"
-              :disabled="isLoading"
-              placeholder="Confirme a senha"
-            />
-            <small v-if="editingUser && formData.password" class="form-help"
-              >Confirme a nova senha</small
-            >
-          </div>
-          <div class="form-group">
-            <label for="nivel_acesso">Nível de Acesso:</label>
-            <select
-              id="nivel_acesso"
-              v-model="formData.nivel_acesso"
-              required
-              :disabled="isLoading"
-              :class="{ 'placeholder-color': !formData.nivel_acesso }"
-            >
-              <option value="" disabled selected>Defina a permissão do usuário</option>
-              <option value="admin">Administrador</option>
-              <option value="exata">Exata</option>
-              <option value="sabesp">SABESP</option>
-              <option value="usuario">Usuário</option>
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label for="divisao_id">Divisão (opcional):</label>
-            <select
-              id="divisao_id"
-              v-model="formData.divisao_id"
-              :disabled="isLoading || isLoadingDivisoes || divisoes.length === 0"
-            >
-              <option :value="null" selected>
-                {{
-                  isLoadingDivisoes ? 'Carregando divisões...' : 'Selecione uma divisão (opcional)'
-                }}
-              </option>
-              <option v-for="divisao in divisoes" :key="divisao.id" :value="divisao.id">
-                ID: {{ divisao.id }} - {{ divisao.nome }}
-              </option>
-            </select>
-            <small v-if="errorDivisoes" class="form-help error-divisoes">
-              {{ errorDivisoes }}
-              <button
-                type="button"
-                class="link-button"
-                @click="loadDivisoes"
-                :disabled="isLoadingDivisoes"
-              >
-                Tentar novamente
-              </button>
-            </small>
-          </div>
-
-          <!-- Mensagem de erro -->
-          <div v-if="errorMessage" class="error-message">
-            {{ errorMessage }}
-          </div>
-
-          <!-- Mensagem de sucesso -->
-          <div v-if="successMessage" class="success-message">
-            {{ successMessage }}
-          </div>
-
-          <div class="form-actions">
-            <button type="submit" class="submit-btn" :disabled="isLoading">
-              <span v-if="isLoading">{{ editingUser ? 'Salvando...' : 'Cadastrando...' }}</span>
-              <span v-else>{{ editingUser ? 'Salvar' : 'Cadastrar' }}</span>
-            </button>
-            <button type="button" @click="closeUserForm" class="cancel-btn" :disabled="isLoading">
-              Cancelar
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  </div>
-</template>
-
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
@@ -460,81 +108,39 @@ async function loadUsers(page = 1) {
 
   console.log('=== loadUsers INICIADO ===')
   console.log('Página solicitada:', page)
-  console.log('Estado atual:', {
-    currentPage: currentPage.value,
-    totalPages: totalPages.value,
-    totalUsers: totalUsers.value,
-  })
 
   try {
-    console.log('Fazendo requisição para API com page:', page, 'limit: 10')
     const response = await userApi.getUsers(page, 10)
 
-    console.log('=== RESPOSTA DA API ===')
-    console.log('Response completo:', response)
-    console.log('Response.data:', response.data)
-    console.log('Tipo de response.data:', typeof response.data)
-    console.log('É array?', Array.isArray(response.data))
-
     // Laravel Paginator response structure (UserCollection)
-    // A resposta vem como: { data: [...], meta: {...}, links: {...} }
     if (response.data) {
-      // Verifica se é a estrutura do Laravel Resource Collection
       if (response.data.data && Array.isArray(response.data.data) && response.data.meta) {
-        console.log('✅ Estrutura Laravel Resource Collection detectada')
-        console.log('Dados recebidos:', response.data.data.length, 'usuários')
-        console.log('Meta completa:', JSON.stringify(response.data.meta, null, 2))
-
-        // Força atualização reativa
         users.value = [...response.data.data]
-
-        // Garante que os valores são números
         const meta = response.data.meta
         currentPage.value = Number(meta.current_page) || Number(page)
         totalPages.value = Number(meta.last_page) || Math.ceil((Number(meta.total) || 0) / 10) || 1
         totalUsers.value = Number(meta.total) || 0
 
-        // Validação adicional: se totalPages não foi calculado corretamente, calcula manualmente
         if (totalPages.value === 1 && totalUsers.value > 10) {
           totalPages.value = Math.ceil(totalUsers.value / 10)
-          console.warn('⚠️ totalPages recalculado manualmente:', totalPages.value)
         }
-
-        console.log('✅ Paginação atualizada:', {
-          currentPage: currentPage.value,
-          totalPages: totalPages.value,
-          totalUsers: totalUsers.value,
-          usersCount: users.value.length,
-          primeiroUsuario: users.value[0]?.email || 'N/A',
-          ultimoUsuario: users.value[users.value.length - 1]?.email || 'N/A',
-          botaoProximoDesabilitado: currentPage.value >= totalPages.value,
-        })
-      }
-      // Fallback: se data é um array direto (sem paginação)
-      else if (Array.isArray(response.data)) {
-        console.log('⚠️ Resposta sem paginação (array direto)')
+      } else if (Array.isArray(response.data)) {
         users.value = [...response.data]
         totalPages.value = 1
         currentPage.value = 1
         totalUsers.value = response.data.length
-      }
-      // Fallback: estrutura alternativa
-      else if (response.data.users && Array.isArray(response.data.users)) {
-        console.log('⚠️ Estrutura alternativa detectada')
+      } else if (response.data.users && Array.isArray(response.data.users)) {
         users.value = [...response.data.users]
         currentPage.value = Number(response.data.current_page) || Number(page)
         totalPages.value = Number(response.data.last_page) || 1
         totalUsers.value = Number(response.data.total) || response.data.users.length
       } else {
-        console.warn('❌ Formato de resposta inesperado:', response.data)
-        console.warn('Chaves do objeto:', Object.keys(response.data))
         users.value = []
         totalPages.value = 1
         currentPage.value = 1
         totalUsers.value = 0
       }
     } else {
-      console.warn('❌ Resposta sem data')
       users.value = []
       totalPages.value = 1
       currentPage.value = 1
@@ -542,12 +148,6 @@ async function loadUsers(page = 1) {
     }
   } catch (error) {
     console.error('❌ Erro ao carregar usuários:', error)
-    console.error('Detalhes do erro:', {
-      message: error.message,
-      response: error.response?.data,
-      status: error.response?.status,
-      config: error.config,
-    })
     errorMessage.value =
       'Erro ao carregar lista de usuários: ' +
       (error.response?.data?.message || error.message || 'Erro desconhecido')
@@ -557,64 +157,22 @@ async function loadUsers(page = 1) {
     totalUsers.value = 0
   } finally {
     isLoadingUsers.value = false
-    console.log('=== loadUsers FINALIZADO ===')
   }
 }
 
 // Navega para uma página específica
 async function goToPage(page) {
-  console.log('=== goToPage INICIADO ===')
-  console.log('goToPage chamado com:', { page, type: typeof page })
-
-  // Valida se a página é válida (não pode ser string como '...')
-  if (typeof page === 'string' && page !== '...' && isNaN(Number(page))) {
-    console.warn('❌ Página inválida (string não numérica):', page)
-    return
-  }
-
-  if (page === '...') {
-    console.warn('❌ Tentativa de navegar para ellipsis')
-    return
-  }
+  if (typeof page === 'string' && page !== '...' && isNaN(Number(page))) return
+  if (page === '...') return
 
   const targetPage = Number(page)
+  if (isNaN(targetPage)) return
 
-  if (isNaN(targetPage)) {
-    console.warn('❌ Página não é um número:', page)
-    return
-  }
+  if (targetPage < 1 || targetPage > totalPages.value) return
+  if (targetPage === currentPage.value) return
 
-  console.log('Página convertida:', {
-    targetPage,
-    currentPage: currentPage.value,
-    totalPages: totalPages.value,
-  })
-
-  // Valida se a página está dentro do range válido
-  if (targetPage < 1 || targetPage > totalPages.value) {
-    console.warn('❌ Página fora do range:', { targetPage, totalPages: totalPages.value })
-    return
-  }
-
-  // Evita recarregar a mesma página
-  if (targetPage === currentPage.value) {
-    console.log('⚠️ Já está na página:', targetPage)
-    return
-  }
-
-  console.log('✅ Validação passou! Carregando página:', targetPage)
-
-  // Carrega a página (aguarda o carregamento)
   await loadUsers(targetPage)
 
-  console.log('✅ Página carregada. Estado atual:', {
-    currentPage: currentPage.value,
-    totalPages: totalPages.value,
-    usersCount: users.value.length,
-  })
-  console.log('=== goToPage FINALIZADO ===')
-
-  // Scroll para o topo da tabela após um pequeno delay
   setTimeout(() => {
     const tableContainer = document.querySelector('.table-container')
     if (tableContainer) {
@@ -625,45 +183,32 @@ async function goToPage(page) {
   }, 100)
 }
 
-// Gera array de números de página para exibição (com ellipsis)
+// Gera array de números de página
 function getPageNumbers() {
   const pages = []
   const total = totalPages.value
   const current = currentPage.value
 
   if (total <= 7) {
-    // Se há 7 ou menos páginas, mostra todas
     for (let i = 1; i <= total; i++) {
       pages.push(i)
     }
   } else {
-    // Sempre mostra primeira página
     pages.push(1)
-
     if (current <= 3) {
-      // Perto do início
-      for (let i = 2; i <= 4; i++) {
-        pages.push(i)
-      }
+      for (let i = 2; i <= 4; i++) pages.push(i)
       pages.push('...')
       pages.push(total)
     } else if (current >= total - 2) {
-      // Perto do fim
       pages.push('...')
-      for (let i = total - 3; i <= total; i++) {
-        pages.push(i)
-      }
+      for (let i = total - 3; i <= total; i++) pages.push(i)
     } else {
-      // No meio
       pages.push('...')
-      for (let i = current - 1; i <= current + 1; i++) {
-        pages.push(i)
-      }
+      for (let i = current - 1; i <= current + 1; i++) pages.push(i)
       pages.push('...')
       pages.push(total)
     }
   }
-
   return pages
 }
 
@@ -671,26 +216,21 @@ function getPageNumbers() {
 function atualizarCJI3() {
   showPepsPopup.value = true
 }
-
 function atualizarContratos() {
   showContratosPopup.value = true
 }
-
 function atualizarCadastro() {
   showCadastroQauntPopup.value = true
 }
-
 function atualizarDenominacao() {
   showDenominacaoPopup.value = true
 }
 
-// Função para mostrar popup de feedback
+// Feedback
 function showFeedback(message, type = 'success') {
   feedbackMessage.value = message
   feedbackType.value = type
   showFeedbackPopup.value = true
-
-  // Fecha automaticamente após 3 segundos
   setTimeout(() => {
     if (showFeedbackPopup.value) {
       closeFeedbackPopup()
@@ -698,98 +238,89 @@ function showFeedback(message, type = 'success') {
   }, 3000)
 }
 
-// Função para fechar popup de feedback
 function closeFeedbackPopup() {
   showFeedbackPopup.value = false
   feedbackMessage.value = ''
   feedbackType.value = 'success'
 }
 
-// Função para salvar usuário (criar ou editar)
 async function saveUser() {
   isLoading.value = true
   errorMessage.value = ''
   successMessage.value = ''
 
   try {
-    // Validação: se senha foi preenchida, confirmação também deve estar preenchida
-    if (formData.value.password && !formData.value.password_confirmation) {
-      errorMessage.value = 'Por favor, confirme a senha.'
-      isLoading.value = false
-      return
+    if (formData.value.password) {
+      if (formData.value.password.length < 8) {
+        errorMessage.value = 'A nova senha precisa ter no mínimo 8 caracteres.'
+        isLoading.value = false
+        return
+      }
+
+      if (!formData.value.password_confirmation) {
+        errorMessage.value = 'Por favor, confirme a nova senha.'
+        isLoading.value = false
+        return
+      }
+
+      if (formData.value.password !== formData.value.password_confirmation) {
+        errorMessage.value = 'As senhas não coincidem.'
+        isLoading.value = false
+        return
+      }
     }
 
-    // Validação: senhas devem ser iguais
-    if (
-      formData.value.password &&
-      formData.value.password !== formData.value.password_confirmation
-    ) {
-      errorMessage.value = 'As senhas não coincidem.'
-      isLoading.value = false
-      return
-    }
-
-    // Prepara dados para envio conforme o JSON fornecido
     const userData = {
       email: formData.value.email.trim(),
       nivel_acesso: formData.value.nivel_acesso,
     }
 
-    // Adiciona name apenas se existir (pode não estar no JSON fornecido, mas mantemos para compatibilidade)
     if (formData.value.name) {
       userData.name = formData.value.name.trim()
     }
 
-    // Adiciona senha e confirmação se foram preenchidas (tanto para criar quanto para editar)
     if (formData.value.password) {
       userData.password = formData.value.password
       userData.password_confirmation = formData.value.password_confirmation
     }
 
-    // Adiciona divisao_id (pode ser null)
     if (formData.value.divisao_id !== null && formData.value.divisao_id !== '') {
       userData.divisao_id = parseInt(formData.value.divisao_id)
     } else {
       userData.divisao_id = null
     }
 
-    let response
     if (editingUser.value) {
-      // Editar usuário existente
-      response = await userApi.updateUser(editingUser.value.id, userData)
-      console.log('Usuário atualizado:', response.data)
-
-      // Fecha o modal do formulário
+      await userApi.updateUser(editingUser.value.id, userData)
       closeUserForm()
-
-      // Mostra popup de sucesso
       showFeedback('Usuário atualizado com sucesso!', 'success')
     } else {
-      // Criar novo usuário
-      response = await userApi.createUser(userData)
-      console.log('Usuário criado:', response.data)
-
-      // Fecha o modal do formulário
+      await userApi.createUser(userData)
       closeUserForm()
-
-      // Mostra popup de sucesso
       showFeedback('Usuário cadastrado com sucesso!', 'success')
     }
-
     await loadUsers(currentPage.value)
   } catch (error) {
     console.error('Erro ao salvar usuário:', error)
-    const errorMsg = error.response?.data?.message || 'Erro ao salvar usuário. Tente novamente.'
-    errorMessage.value = errorMsg
+    const errorResponse = error.response?.data
+    let msg = 'Erro ao salvar usuário.'
 
-    // Mostra popup de erro
-    showFeedback(errorMsg, 'error')
+    if (errorResponse?.message) {
+      msg = errorResponse.message
+    } else if (errorResponse?.errors) {
+      msg = Object.values(errorResponse.errors).flat()[0]
+    }
+
+    errorMessage.value = msg
+    showFeedback(msg, 'error')
   } finally {
     isLoading.value = false
+    setTimeout(() => {
+      errorMessage.value = ''
+    }, 3000)
   }
 }
 
-// Função para editar usuário
 function editUser(user) {
   editingUser.value = user
   formData.value = {
@@ -813,37 +344,24 @@ function closeDeleteModalUser() {
   userToDelete.value = null
 }
 
-// Função para excluir usuário
 async function confirmDeleteUser() {
   if (!userToDelete.value) return
-
   try {
     isLoading.value = true
     await userApi.deleteUser(userToDelete.value.id)
-
-    // Fecha o modal de confirmação
     closeDeleteModalUser()
-
-    // Mostra popup de sucesso
     showFeedback('Usuário excluído com sucesso!', 'success')
-
-    // Recarrega a lista de usuários
     await loadUsers(currentPage.value)
   } catch (error) {
     console.error('Erro ao excluir usuário:', error)
     const errorMsg = error.response?.data?.message || 'Erro ao excluir usuário. Tente novamente.'
-
-    // Fecha o modal de confirmação
     closeDeleteModalUser()
-
-    // Mostra popup de erro
     showFeedback(errorMsg, 'error')
   } finally {
     isLoading.value = false
   }
 }
 
-// Função para fechar modal
 function closeUserForm() {
   showUserForm.value = false
   editingUser.value = null
@@ -859,150 +377,7 @@ function closeUserForm() {
   successMessage.value = ''
 }
 
-// Função para testar conexão com API
-async function testApiConnection() {
-  console.log('=== TESTE DE CONEXÃO COM API ===')
-
-  try {
-    // Teste 1: Verificar se a API está respondendo
-    console.log('1. Testando conectividade básica...')
-    const response = await fetch('http://127.0.0.1:8000/api/v1/users', {
-      method: 'GET',
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-      },
-    })
-
-    console.log('Status da resposta:', response.status)
-    console.log('Headers da resposta:', Object.fromEntries(response.headers.entries()))
-
-    if (!response.ok) {
-      console.error('Erro HTTP:', response.status, response.statusText)
-      const errorText = await response.text()
-      console.error('Conteúdo do erro:', errorText)
-      alert(`Erro HTTP ${response.status}: ${response.statusText}\n\nDetalhes: ${errorText}`)
-      return
-    }
-
-    // Teste 2: Verificar conteúdo da resposta
-    console.log('2. Analisando conteúdo da resposta...')
-    const data = await response.json()
-    console.log('Dados recebidos:', data)
-    console.log('Tipo dos dados:', typeof data)
-    console.log('É array?', Array.isArray(data))
-
-    if (data && typeof data === 'object') {
-      console.log('Propriedades do objeto:', Object.keys(data))
-    }
-
-    // Teste 3: Verificar autenticação
-    console.log('3. Verificando autenticação...')
-    const token = localStorage.getItem('auth_token')
-    console.log('Token encontrado:', token ? 'Sim' : 'Não')
-
-    if (token) {
-      console.log('Testando com token...')
-      const authResponse = await fetch('http://127.0.0.1:8000/api/v1/users', {
-        method: 'GET',
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-      })
-
-      console.log('Status com token:', authResponse.status)
-      if (authResponse.ok) {
-        const authData = await authResponse.json()
-        console.log('Dados com autenticação:', authData)
-      }
-    }
-
-    alert('Teste concluído! Verifique o console para detalhes.')
-  } catch (error) {
-    console.error('Erro no teste de conexão:', error)
-    alert(`Erro de conexão: ${error.message}\n\nVerifique se o backend Laravel está rodando.`)
-  }
-}
-
-// Função para testar cadastro de usuário
-async function testUserRegistration() {
-  console.log('=== TESTE DE CADASTRO DE USUÁRIO ===')
-
-  try {
-    // Dados de teste para cadastro
-    const testUser = {
-      name: 'Usuário Teste',
-      email: `teste${Date.now()}@exemplo.com`,
-      password: '12345678',
-      password_confirmation: '12345678',
-      nivel_acesso: 'exata',
-      divisao_id: 1,
-    }
-
-    console.log('1. Dados do usuário de teste:', testUser)
-
-    // Teste 1: Verificar endpoint de cadastro
-    console.log('2. Testando endpoint /api/v1/register...')
-    const response = await fetch('http://127.0.0.1:8000/api/v1/register', {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(testUser),
-    })
-
-    console.log('Status da resposta:', response.status)
-    console.log('Headers da resposta:', Object.fromEntries(response.headers.entries()))
-
-    const responseData = await response.json()
-    console.log('Dados da resposta:', responseData)
-
-    if (response.ok) {
-      console.log('✅ Cadastro realizado com sucesso!')
-      alert(
-        `✅ Usuário cadastrado com sucesso!\n\nEmail: ${testUser.email}\n\nAgora teste listar os usuários.`,
-      )
-
-      // Recarrega a lista de usuários após cadastro bem-sucedido
-      setTimeout(() => {
-        loadUsers()
-      }, 1000)
-    } else {
-      console.error('❌ Erro no cadastro:', responseData)
-      alert(
-        `❌ Erro no cadastro:\n\nStatus: ${response.status}\nMensagem: ${responseData.message || 'Erro desconhecido'}\n\nDetalhes: ${JSON.stringify(responseData, null, 2)}`,
-      )
-    }
-  } catch (error) {
-    console.error('Erro no teste de cadastro:', error)
-    alert(
-      `❌ Erro de conexão no cadastro: ${error.message}\n\nVerifique se o backend Laravel está rodando.`,
-    )
-  }
-}
-
-// Função para obter label do nível de acesso
-function getAccessLevelLabel(nivel) {
-  const labels = {
-    admin: 'Administrador',
-    exata: 'Exata',
-    sabesp: 'SABESP',
-    usuario: 'Usuário',
-  }
-  return labels[nivel] || nivel
-}
-
-// Função helper para calcular range de usuários exibidos
-function getUsersRange() {
-  const start = (currentPage.value - 1) * 10 + 1
-  const end = Math.min(currentPage.value * 10, totalUsers.value)
-  return { start, end }
-}
-
-// Função para upload de PEPS
+// Upload PEPS
 async function handlePepsUpload(file) {
   try {
     isLoading.value = true
@@ -1010,8 +385,6 @@ async function handlePepsUpload(file) {
     successMessage.value = ''
 
     const response = await pepsApi.uploadPeps(file)
-
-    // O controller retorna: { message, statistics: { total_imported, total_skipped, total_failed }, failures? }
     const statistics = response.data.statistics || {}
     const totalImported = statistics.total_imported || 0
     const totalSkipped = statistics.total_skipped || 0
@@ -1025,75 +398,465 @@ async function handlePepsUpload(file) {
 
     if (failures.length > 0) {
       message += `\n\n⚠️ Detalhes das falhas:`
-      failures.slice(0, 5).forEach((failure, index) => {
+      failures.slice(0, 5).forEach((failure) => {
         message += `\n  Linha ${failure.row}: ${failure.errors?.join(', ') || 'Erro desconhecido'}`
       })
       if (failures.length > 5) {
         message += `\n  ... e mais ${failures.length - 5} falha(s)`
       }
-      console.warn('Falhas no processamento:', failures)
     }
 
     successMessage.value = message
     showPepsPopup.value = false
-
     setTimeout(() => {
       successMessage.value = ''
-    }, 8000) // Aumentado para 8 segundos para dar tempo de ler
+    }, 8000)
   } catch (error) {
     console.error('Erro ao fazer upload de PEPS:', error)
-
-    // Tratamento específico para erros de validação (422)
     if (error.response?.status === 422) {
       const errors = error.response.data.errors || []
       let errorMsg =
         error.response.data.message || 'Erro ao processar arquivo. Algumas linhas contêm erros.'
-
       if (errors.length > 0) {
         errorMsg += '\n\nDetalhes:'
-        errors.slice(0, 5).forEach((err, index) => {
+        errors.slice(0, 5).forEach((err) => {
           errorMsg += `\n  Linha ${err.row}: ${err.errors?.join(', ') || 'Erro desconhecido'}`
         })
-        if (errors.length > 5) {
-          errorMsg += `\n  ... e mais ${errors.length - 5} erro(s)`
-        }
+        if (errors.length > 5) errorMsg += `\n  ... e mais ${errors.length - 5} erro(s)`
       }
-
       errorMessage.value = errorMsg
     } else {
       errorMessage.value =
         error.response?.data?.message ||
         error.response?.data?.error ||
-        'Erro ao fazer upload do arquivo PEPS. Verifique o formato do arquivo e tente novamente.'
+        'Erro ao fazer upload do arquivo PEPS.'
     }
   } finally {
     isLoading.value = false
   }
 }
 
-// Funções placeholder para outros uploads
-function handleDenominacaoUpload(file) {
-  console.log('Upload de Denominação:', file)
-  // Implementar quando necessário
+// Testes (mantidos simplificados)
+async function testApiConnection() {
+  try {
+    const response = await fetch('http://127.0.0.1:8000/api/v1/users', {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+    })
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    alert('Conexão OK!')
+  } catch (error) {
+    alert(`Erro de conexão: ${error.message}`)
+  }
 }
 
-function handleCadastroQuantUpload(file) {
-  console.log('Upload de Cadastro Quantitativo:', file)
-  // Implementar quando necessário
+async function testUserRegistration() {
+  alert('Função de teste de registro simplificada.')
 }
 
-function handleContratosUpload(file) {
-  console.log('Upload de Contratos:', file)
-  // Implementar quando necessário
+function getAccessLevelLabel(nivel) {
+  const labels = {
+    admin: 'Administrador',
+    exata: 'Exata',
+    sabesp: 'SABESP',
+    usuario: 'Usuário',
+  }
+  return labels[nivel] || nivel
 }
 
-function handleCji3Upload(file) {
-  console.log('Upload de CJI3:', file)
-  // Implementar quando necessário
+function getUsersRange() {
+  const start = (currentPage.value - 1) * 10 + 1
+  const end = Math.min(currentPage.value * 10, totalUsers.value)
+  return { start, end }
 }
 </script>
 
+<template>
+  <div class="page-root">
+    <div class="admin-panel">
+      <HeaderNoHR />
+
+      <Transition name="modal-fade">
+        <div class="confirmation-backdrop" v-if="isDeleteUser" @click="closeDeleteModalUser">
+          <div class="confirmation-window">
+            <div class="confirmation-heading">
+              <h1>Tem certeza que deseja<br />excluir o usuário?</h1>
+            </div>
+
+            <div>
+              <span class="target-user-display"
+                >({{ userToDelete ? userToDelete.name : 'usuário' }})</span
+              >
+            </div>
+
+            <div class="confirmation-text">
+              <p>O usuário <strong>SERÁ</strong> excluído do banco de dados.</p>
+            </div>
+
+            <div class="confirmation-actions">
+              <button class="action-button action-cancel" @click="closeDeleteModalUser">Não</button>
+              <button class="action-button action-confirm" @click="confirmDeleteUser">Sim</button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+
+      <main class="admin-content">
+        <div class="admin-card">
+          <div class="admin-buttons">
+            <button @click="atualizarContratos" class="admin-btn">
+              <span class="btn-icon"></span>
+              Atualizar Contratos
+            </button>
+            <button @click="atualizarCJI3" class="admin-btn">
+              <span class="btn-icon"></span>
+              Atualizar CJI3
+            </button>
+            <button @click="atualizarCadastro" class="admin-btn">
+              <span class="btn-icon"></span>
+              Atualizar Cadastro
+            </button>
+            <button @click="atualizarDenominacao" class="admin-btn">
+              <span class="btn-icon"></span>
+              Arquivos Denominação
+            </button>
+            <button @click="showUserForm = true" class="admin-btn">
+              <span class="btn-icon"></span>
+              Novo Usuário
+            </button>
+          </div>
+
+          <div class="users-section">
+            <div class="users-header"></div>
+            <div class="table-container">
+              <div v-if="isLoadingUsers" class="loading-users">
+                <div class="loading-spinner"></div>
+                <span>Carregando usuários...</span>
+              </div>
+              <table v-else class="users-table">
+                <thead>
+                  <tr>
+                    <th style="text-align: center">Nome Completo</th>
+                    <th style="text-align: center">Email</th>
+                    <th style="text-align: center">Nível de Acesso</th>
+                    <th style="text-align: center">Divisão</th>
+                    <th style="text-align: center">Editar</th>
+                    <th style="text-align: center">Excluir</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="user in users" :key="user.id">
+                    <td>{{ user.name }}</td>
+                    <td>{{ user.email }}</td>
+                    <td>
+                      <span class="access-level" :class="user.nivel_acesso">
+                        {{ getAccessLevelLabel(user.nivel_acesso) }}
+                      </span>
+                    </td>
+                    <td>{{ user.divisao_id || '-' }}</td>
+                    <td class="actions">
+                      <button @click="editUser(user)" class="action-btn edit-btn" title="Editar">
+                        <IconEdit />
+                      </button>
+                    </td>
+                    <td>
+                      <button
+                        @click="promptDeleteUser(user)"
+                        class="action-btn delete-btn"
+                        title="Excluir"
+                      >
+                        <IconDelete />
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <div v-if="!isLoadingUsers && users.length === 0" class="no-users">
+                <div class="no-users-content">
+                  <h4>Nenhum usuário cadastrado</h4>
+                  <p>Verifique se:</p>
+                  <ul>
+                    <li>O backend Laravel está rodando em <code>http://127.0.0.1:8000</code></li>
+                    <li>O endpoint <code>/api/v1/users</code> está funcionando</li>
+                    <li>Existem usuários cadastrados no banco de dados</li>
+                    <li>Você está autenticado (token válido)</li>
+                  </ul>
+                  <div class="test-buttons">
+                    <button @click="testApiConnection" class="test-api-btn">
+                      🔍 Testar Conexão com API
+                    </button>
+                    <button @click="testUserRegistration" class="test-api-btn">
+                      👤 Testar Cadastro de Usuário
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="!isLoadingUsers && users.length > 0" class="pagination-container">
+          <div class="pagination-info">
+            <span>
+              Mostrando {{ getUsersRange().start }} a {{ getUsersRange().end }} de
+              {{ totalUsers }} usuário{{ totalUsers !== 1 ? 's' : '' }}
+            </span>
+          </div>
+
+          <div class="pagination-controls">
+            <button
+              @click="goToPage(currentPage - 1)"
+              :disabled="currentPage === 1 || isLoadingUsers"
+              class="pagination-btn"
+              title="Página anterior"
+            >
+              ← Anterior
+            </button>
+
+            <div class="pagination-pages">
+              <button
+                v-for="page in getPageNumbers()"
+                :key="page"
+                @click="goToPage(page)"
+                :disabled="isLoadingUsers"
+                :class="[
+                  'pagination-page-btn',
+                  { active: page === currentPage, ellipsis: page === '...' },
+                ]"
+              >
+                {{ page }}
+              </button>
+            </div>
+
+            <button
+              @click="goToPage(currentPage + 1)"
+              :disabled="currentPage >= totalPages || isLoadingUsers"
+              class="pagination-btn"
+              :title="`Próxima página (${currentPage + 1} de ${totalPages})`"
+            >
+              Próxima →
+            </button>
+          </div>
+        </div>
+      </main>
+
+      <PopupLoadView
+        v-if="showDenominacaoPopup"
+        title="Carregar Denominação"
+        @close="showDenominacaoPopup = false"
+      />
+
+      <PopupLoadView
+        v-if="showCadastroQauntPopup"
+        title="Carregar Quantitativo Cadastro"
+        @close="showCadastroQauntPopup = false"
+      />
+
+      <PopupLoadView
+        v-if="showContratosPopup"
+        title="Carregar Contratos"
+        @close="showContratosPopup = false"
+      />
+
+      <PopupLoadView v-if="showCji3Popup" title="Carregar CJI3" @close="showCji3Popup = false" />
+
+      <PopupLoadView
+        v-if="showPepsPopup"
+        title="Carregar CJI3"
+        @close="showPepsPopup = false"
+        @upload="handlePepsUpload"
+      />
+
+      <Transition name="modal-fade">
+        <div v-if="showFeedbackPopup" class="modal-overlay" @click="closeFeedbackPopup">
+          <div class="feedback-card" :class="feedbackType" @click.stop>
+            <div v-if="feedbackType === 'success'" class="feedback-icon-wrapper icon-success">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke-width="2"
+                stroke="currentColor"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+              </svg>
+            </div>
+
+            <div v-else class="feedback-icon-wrapper icon-error">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke-width="2"
+                stroke="currentColor"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </div>
+
+            <h3 class="feedback-title">
+              {{ feedbackType === 'success' ? 'Sucesso!' : 'Atenção' }}
+            </h3>
+
+            <p class="feedback-message">
+              {{ feedbackMessage }}
+            </p>
+
+            <button @click="closeFeedbackPopup" class="feedback-btn" :class="feedbackType">
+              Entendido
+            </button>
+          </div>
+        </div>
+      </Transition>
+
+      <Transition name="modal-fade">
+        <div v-if="showUserForm" class="modal-overlay" @click="closeUserForm">
+          <Transition name="slide-down">
+            <div v-if="errorMessage" class="floating-error-notification">
+              <span class="error-icon">⚠️</span>
+              {{ errorMessage }}
+              <button type="button" @click="errorMessage = ''" class="close-error">&times;</button>
+            </div>
+          </Transition>
+
+          <div class="modal-content" @click.stop>
+            <div class="modal-header">
+              <h3>{{ editingUser ? 'Informações do Usuário' : 'Informações do Novo Usuário' }}</h3>
+              <button @click="closeUserForm" class="close-btn">&times;</button>
+            </div>
+            <hr class="modal-hr" />
+
+            <form @submit.prevent="saveUser" class="user-form">
+              <div class="form-group">
+                <label for="name">Nome Completo:</label>
+                <input
+                  type="text"
+                  id="name"
+                  v-model="formData.name"
+                  required
+                  :disabled="isLoading"
+                  placeholder="Nome do Colaborador"
+                />
+              </div>
+
+              <div class="form-group">
+                <label for="email">E-mail:</label>
+                <input
+                  type="email"
+                  id="email"
+                  v-model="formData.email"
+                  required
+                  :disabled="isLoading"
+                  placeholder="E-mail de acesso do colaborador"
+                />
+              </div>
+
+              <div class="form-group">
+                <label for="password">Senha:</label>
+                <input
+                  type="password"
+                  id="password"
+                  v-model="formData.password"
+                  :required="!editingUser"
+                  :disabled="isLoading"
+                  autocomplete="new-password"
+                  placeholder="Mínimo de 8 caracteres, com letras e números."
+                />
+              </div>
+
+              <div class="form-group">
+                <label for="password_confirmation">Confirmar Senha:</label>
+                <input
+                  type="password"
+                  id="password_confirmation"
+                  v-model="formData.password_confirmation"
+                  :required="!editingUser || (editingUser && formData.password)"
+                  :disabled="isLoading"
+                  autocomplete="new-password"
+                  placeholder="Confirme a senha"
+                />
+              </div>
+              <div class="form-group">
+                <label for="nivel_acesso">Nível de Acesso:</label>
+                <select
+                  id="nivel_acesso"
+                  v-model="formData.nivel_acesso"
+                  required
+                  :disabled="isLoading"
+                  :class="{ 'placeholder-color': !formData.nivel_acesso }"
+                >
+                  <option value="" disabled selected>Defina a permissão do usuário</option>
+                  <option value="admin">Administrador</option>
+                  <option value="exata">Exata</option>
+                  <option value="sabesp">SABESP</option>
+                  <option value="usuario">Usuário</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label for="divisao_id">Divisão (opcional):</label>
+                <select
+                  id="divisao_id"
+                  v-model="formData.divisao_id"
+                  :disabled="isLoading || isLoadingDivisoes || divisoes.length === 0"
+                >
+                  <option :value="null" selected>
+                    {{
+                      isLoadingDivisoes
+                        ? 'Carregando divisões...'
+                        : 'Selecione uma divisão (opcional)'
+                    }}
+                  </option>
+                  <option v-for="divisao in divisoes" :key="divisao.id" :value="divisao.id">
+                    ID: {{ divisao.id }} - {{ divisao.nome }}
+                  </option>
+                </select>
+                <small v-if="errorDivisoes" class="form-help error-divisoes">
+                  {{ errorDivisoes }}
+                  <button
+                    type="button"
+                    class="link-button"
+                    @click="loadDivisoes"
+                    :disabled="isLoadingDivisoes"
+                  >
+                    Tentar novamente
+                  </button>
+                </small>
+              </div>
+
+              <div class="form-actions">
+                <button type="submit" class="submit-btn" :disabled="isLoading">
+                  <span v-if="isLoading">{{ editingUser ? 'Salvando...' : 'Cadastrando...' }}</span>
+                  <span v-else>{{ editingUser ? 'Salvar' : 'Cadastrar' }}</span>
+                </button>
+                <button
+                  type="button"
+                  @click="closeUserForm"
+                  class="cancel-btn"
+                  :disabled="isLoading"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </Transition>
+    </div>
+  </div>
+</template>
+
 <style scoped>
+/* Classe para corrigir a transição do Vue e evitar tela branca */
+.page-root {
+  width: 100%;
+  min-height: 100vh;
+}
+
 td {
   text-align: center;
 }
@@ -1126,7 +889,6 @@ th {
   margin-bottom: 2rem;
 }
 
-/* Botões de ação - Todos na mesma linha, tamanho original */
 .admin-buttons {
   display: flex;
   flex-wrap: nowrap;
@@ -1137,7 +899,6 @@ th {
   padding-bottom: 0.5rem;
 }
 
-/* Scrollbar customizada para os botões */
 .admin-buttons::-webkit-scrollbar {
   height: 6px;
 }
@@ -1155,7 +916,6 @@ th {
   background-color: rgba(19, 44, 13, 0.5);
 }
 
-/* Em telas muito pequenas, permite wrap */
 @media (max-width: 768px) {
   .admin-buttons {
     flex-wrap: wrap;
@@ -1179,7 +939,6 @@ th {
   min-height: 60px;
   white-space: nowrap;
   flex-shrink: 0;
-  /* Todos os botões com o mesmo tamanho */
   flex: 1 1 auto;
   min-width: 180px;
   width: 100%;
@@ -1195,7 +954,6 @@ th {
   font-size: 1.2rem;
 }
 
-/* Seção de usuários */
 .users-section {
   margin-top: 2rem;
 }
@@ -1213,37 +971,12 @@ th {
   font-size: 1.3rem;
 }
 
-.reload-btn {
-  background-color: #132c0d;
-  color: white;
-  padding: 0.5rem 1rem;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.875rem;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  transition: background-color 0.3s ease;
-}
-
-.reload-btn:hover:not(:disabled) {
-  background-color: #0f2410;
-}
-
-.reload-btn:disabled {
-  background-color: #ccc;
-  cursor: not-allowed;
-}
-
-/* Container de Tabela - Grid System Melhorado */
 .table-container {
   overflow-x: auto;
   overflow-y: auto;
   max-height: 54vh;
   border-radius: 8px;
   border: 1px solid #e0e0e0;
-  /* Melhorias de scroll */
   scrollbar-width: thin;
   scrollbar-color: rgba(19, 44, 13, 0.3) transparent;
 }
@@ -1266,21 +999,17 @@ th {
   background-color: rgba(19, 44, 13, 0.5);
 }
 
-/* Tabela de Usuários - Grid System Melhorado */
 .users-table {
   width: 100%;
   border-collapse: collapse;
   background: white;
-  /* Melhor renderização */
   table-layout: auto;
 }
 
-/* Melhorias responsivas para tabela */
 @media (max-width: 768px) {
   .users-table {
     font-size: 0.8rem;
   }
-
   .users-table th,
   .users-table td {
     padding: 0.6rem 0.5rem;
@@ -1327,17 +1056,14 @@ th {
   background-color: #ffebee;
   color: #c62828;
 }
-
 .access-level.exata {
   background-color: #fff3e0;
   color: #ef6c00;
 }
-
 .access-level.sabesp {
   background-color: #e3f2fd;
   color: #1565c0;
 }
-
 .access-level.usuario {
   background-color: #e8f5e8;
   color: #2e7d32;
@@ -1366,17 +1092,14 @@ th {
 .edit-btn:hover {
   background-color: #e3f2fd;
 }
-
 .delete-btn:hover {
   background-color: #ffebee;
 }
 
-/* Controles de Paginação */
 .pagination-container {
   display: flex;
   flex-direction: column;
   gap: 1rem;
-  padding: 1rem;
   padding: 10px;
   border-radius: 8px;
   border-top: 2px solid #e0e0e0;
@@ -1555,7 +1278,6 @@ th {
   }
 }
 
-/* Modal */
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -1571,6 +1293,7 @@ th {
 }
 
 .modal-content {
+  position: relative;
   background: white;
   border-radius: 20px;
   width: 100%;
@@ -1606,19 +1329,74 @@ th {
 
 .modal-content::-webkit-scrollbar-track {
   background: transparent;
-
   border-right: 4px solid white;
   background-clip: content-box;
 }
 
 .modal-content::-webkit-scrollbar-thumb {
   background-color: #cccccc;
-  border-radius: 10px; /* Deixa a barra arredondada */
+  border-radius: 10px;
   border: 4px solid white;
 }
 
 .modal-content::-webkit-scrollbar-thumb:hover {
-  background-color: #a8a8a8; /* Cor ao passar o mouse */
+  background-color: #a8a8a8;
+}
+
+.floating-error-notification {
+  position: absolute;
+  top: 90px; /* Ajuste para ficar logo abaixo da linha HR */
+  left: 50%;
+  transform: translateX(-50%); /* Centraliza perfeitamente */
+
+  background-color: #fef2f2; /* Fundo vermelho bem claro */
+  color: #991b1b; /* Texto vermelho escuro */
+  border: 1px solid #fca5a5;
+
+  padding: 10px 20px;
+  border-radius: 50px; /* Formato de Pílula moderno */
+
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); /* Sombra para dar profundidade */
+  z-index: 100; /* Fica por cima dos inputs */
+
+  font-size: 0.9rem;
+  font-weight: 600;
+  white-space: nowrap;
+  max-width: 90%;
+}
+
+.error-icon {
+  font-size: 1.1rem;
+}
+
+.close-error {
+  background: none;
+  border: none;
+  color: #991b1b;
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 0 0 0 10px;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+.close-error:hover {
+  opacity: 1;
+}
+
+.slide-down-enter-active,
+.slide-down-leave-active {
+  transition: all 0.3s ease;
+}
+
+.slide-down-enter-from,
+.slide-down-leave-to {
+  opacity: 0;
+  transform: translate(-50%, -20px);
 }
 
 .close-btn {
@@ -1640,7 +1418,34 @@ th {
   background-color: #f0f0f0;
 }
 
-/* Formulário de Usuário - Grid System Melhorado */
+.modal-fade-enter-active,
+.modal-fade-leave-active {
+  transition: opacity 0.3s ease-out;
+}
+
+.modal-fade-enter-active .modal-content {
+  transition:
+    opacity 0.3s ease-out,
+    transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.modal-fade-leave-active .modal-content {
+  transition:
+    opacity 0.2s ease-in,
+    transform 0.2s ease-in;
+}
+
+.modal-fade-enter-from,
+.modal-fade-leave-to {
+  opacity: 0;
+}
+
+.modal-fade-enter-from .modal-content,
+.modal-fade-leave-to .modal-content {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
 .user-form {
   padding: 1.5rem;
   display: grid;
@@ -1649,26 +1454,36 @@ th {
   align-items: start;
 }
 
-/* Breakpoints para formulário */
-@media (min-width: 1200px) {
-  .user-form {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 2rem 2.5rem;
-  }
+.modal-fade-enter-active,
+.modal-fade-leave-active {
+  transition: opacity 0.3s ease-out;
 }
 
-@media (min-width: 900px) and (max-width: 1199px) {
-  .user-form {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 1.5rem 2rem;
-  }
+.modal-fade-enter-active .modal-content,
+.modal-fade-enter-active .confirmation-window {
+  transition:
+    opacity 0.3s ease-out,
+    transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-@media (min-width: 768px) and (max-width: 899px) {
-  .user-form {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 1.25rem 1.5rem;
-  }
+.modal-fade-leave-active .modal-content,
+.modal-fade-leave-active .confirmation-window {
+  transition:
+    opacity 0.2s ease-in,
+    transform 0.2s ease-in;
+}
+
+.modal-fade-enter-from,
+.modal-fade-leave-to {
+  opacity: 0;
+}
+
+.modal-fade-enter-from .modal-content,
+.modal-fade-leave-to .modal-content,
+.modal-fade-enter-from .confirmation-window,
+.modal-fade-leave-to .confirmation-window {
+  opacity: 0;
+  transform: translateY(20px);
 }
 
 .form-group {
@@ -1688,22 +1503,19 @@ th {
 .error-message,
 .success-message,
 .form-actions {
-  /* Esta linha faz o elemento "pular" e ocupar as 2 colunas da grade */
   grid-column: span 2;
 }
 
 .form-group select {
-  color: #333; /* Uma cor de texto normal, como preto ou cinza escuro */
+  color: #333;
 }
 
-/* ESTA É A MÁGICA: Cor do select quando o placeholder está visível */
 .form-group select.placeholder-color {
-  color: #999; /* Um cinza mais claro, típico de placeholders */
+  color: #999;
 }
 
-/* Garante que os placeholders dos INPUTS também usem essa cor */
 .form-group input::placeholder {
-  color: #999; /* O mesmo cinza claro */
+  color: #999;
 }
 
 .form-group input,
@@ -1918,7 +1730,6 @@ th {
   box-shadow: 0 4px 12px rgba(139, 14, 14, 0.8);
 }
 
-/* --- Popup de Feedback --- */
 .feedback-popup-overlay {
   position: fixed;
   top: 0;
@@ -1933,6 +1744,109 @@ th {
   padding: 20px;
   box-sizing: border-box;
   animation: fadeIn 0.2s ease-out;
+}
+
+.feedback-card {
+  background: white;
+  width: 100%;
+  max-width: 380px; /* Mais compacto que o modal de edição */
+  padding: 32px 24px;
+  border-radius: 20px;
+  text-align: center;
+  box-shadow:
+    0 20px 25px -5px rgba(0, 0, 0, 0.1),
+    0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  /* Reutiliza a animação modal-fade automaticamente */
+}
+
+/* Círculos dos Ícones */
+.feedback-icon-wrapper {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.feedback-icon-wrapper svg {
+  width: 32px;
+  height: 32px;
+}
+
+/* Cores de Sucesso */
+.icon-success {
+  background-color: #dcfce7; /* Verde bem claro */
+  color: #15803d; /* Verde escuro */
+}
+
+/* Cores de Erro */
+.icon-error {
+  background-color: #fee2e2; /* Vermelho bem claro */
+  color: #b91c1c; /* Vermelho escuro */
+}
+
+/* Tipografia */
+.feedback-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 8px 0;
+}
+
+.feedback-message {
+  font-size: 1rem;
+  color: #6b7280; /* Cinza médio */
+  line-height: 1.5;
+  margin: 0 0 24px 0;
+}
+
+/* Botão de Ação */
+.feedback-btn {
+  width: 100%;
+  padding: 12px;
+  border-radius: 10px;
+  border: none;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: white;
+}
+
+/* Botão Verde (Sucesso) */
+.feedback-btn.success {
+  background-color: rgba(19, 44, 13, 0.9); /* Sua cor de marca */
+}
+
+.feedback-btn.success:hover {
+  background-color: #0f2410;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(19, 44, 13, 0.2);
+}
+
+/* Botão Vermelho (Erro) */
+.feedback-btn.error {
+  background-color: #dc2626;
+}
+
+.feedback-btn.error:hover {
+  background-color: #b91c1c;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.2);
+}
+
+/* Ajuste para telas pequenas */
+@media (max-width: 640px) {
+  .feedback-card {
+    max-width: 90%;
+    padding: 24px 20px;
+  }
 }
 
 @keyframes fadeIn {
@@ -2015,151 +1929,144 @@ th {
   background-color: rgba(198, 40, 40, 1);
 }
 
-/* Responsividade do Popup de Feedback */
 @media (max-width: 600px) {
   .feedback-popup-content {
     max-width: 90%;
     padding: 1.5rem;
   }
-
   .feedback-popup-icon {
     font-size: 3rem;
   }
-
   .feedback-popup-message {
     font-size: 1rem;
   }
 }
 
-/* Telas Médias (tablets) - a partir de 1024px para baixo */
 @media (max-width: 1024px) {
   .modal-content {
-    max-width: 90%; /* Aumenta a largura em telas médias */
-    height: auto; /* Altura se ajusta ao conteúdo */
-    max-height: 90vh; /* Limita a altura máxima */
+    max-width: 90%;
+    height: auto;
+    max-height: 90vh;
   }
-
   .user-form {
-    /* Mantém as duas colunas, mas com menos espaçamento */
     grid-template-columns: repeat(2, 1fr);
     gap: 1.25rem 1.5rem;
     padding: 1rem;
   }
-
   .form-group label {
-    font-size: 16px; /* Reduz um pouco o tamanho da fonte */
+    font-size: 16px;
     margin-left: 15px;
   }
-
   .form-group input,
   .form-group select {
     margin-left: 15px;
     padding: 0.6rem;
   }
-
   .form-actions {
     gap: 1rem;
   }
-
   .submit-btn,
   .cancel-btn {
     padding: 12px;
     font-size: 18px;
   }
-
   .confirmation-window {
-    max-width: 85%; /* Aumenta um pouco a largura */
-    height: auto; /* Altura automática para não sobrar espaço */
-    max-height: 80vh; /* Limite para não estourar a tela */
+    max-width: 85%;
+    height: auto;
+    max-height: 80vh;
     padding: 2rem;
   }
-
   .confirmation-heading h1 {
-    font-size: 1.8rem; /* Reduz um pouco o título */
+    font-size: 1.8rem;
     margin-top: 10%;
   }
 }
 
-/* Telas Pequenas (celulares) - a partir de 768px para baixo */
 @media (max-width: 768px) {
   .modal-content {
-    /* Ocupa quase toda a tela, com uma pequena margem */
     width: 95%;
-    max-width: 500px; /* Evita que fique muito largo em celulares maiores */
+    max-width: 500px;
     height: auto;
-    max-height: 85vh; /* Garante espaço para a interface do navegador */
+    max-height: 85vh;
     padding: 0.5rem;
   }
-
   .modal-header {
     padding: 1rem;
   }
-
   .modal-header h3 {
     font-size: 20px;
     margin-left: 10px;
   }
-
   .user-form {
-    /* Muda para uma única coluna */
     grid-template-columns: 1fr;
-    gap: 1rem; /* Espaçamento entre os campos */
+    gap: 1rem;
     padding: 1rem;
   }
-
   .form-group label {
-    margin-top: 10px; /* Reduz o espaçamento superior */
+    margin-top: 10px;
     margin-left: 0;
   }
-
   .form-group input,
   .form-group select {
-    width: 100%; /* Ocupa a largura total */
+    width: 100%;
     margin-left: 0;
   }
-
-  /* Faz com que as mensagens e os botões continuem ocupando a largura total */
   .error-message,
   .success-message,
   .form-actions {
-    grid-column: 1 / -1; /* Garante que ocupe toda a grade de 1 coluna */
+    grid-column: 1 / -1;
   }
-
   .form-actions {
-    flex-direction: column; /* Botões um em cima do outro */
-    gap: 0.75rem; /* Espaçamento entre os botões */
+    flex-direction: column;
+    gap: 0.75rem;
     margin-top: 1rem;
   }
-
   .submit-btn,
   .cancel-btn {
-    width: 100%; /* Botões ocupam a largura toda */
+    width: 100%;
     font-size: 16px;
     padding: 14px;
   }
-
   .confirmation-window {
-    width: 95%; /* Ocupa quase toda a largura */
+    width: 95%;
     max-width: none;
     height: auto;
     max-height: 90vh;
-    padding: 1.5rem; /* Menos padding interno para sobrar espaço pro conteúdo */
+    padding: 1.5rem;
   }
-
   .confirmation-heading h1 {
-    font-size: 1.5rem; /* Título menor para não quebrar linha demais */
+    font-size: 1.5rem;
     margin-top: 5%;
   }
-
   .confirmation-actions {
-    flex-direction: column; /* Botões um em cima do outro */
+    flex-direction: column;
     gap: 0.8rem;
   }
-
   .action-button {
-    width: 100%; /* Botões ocupam a largura total */
-    margin-top: 0.5rem; /* Menos margem superior */
-    padding: 12px; /* Ajuste de área de toque */
+    width: 100%;
+    margin-top: 0.5rem;
+    padding: 12px;
+  }
+}
+
+@media (min-width: 1200px) {
+  .user-form {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 2rem 2.5rem;
+  }
+}
+
+@media (min-width: 900px) and (max-width: 1199px) {
+  .user-form {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem 2rem;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 899px) {
+  .user-form {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.25rem 1.5rem;
   }
 }
 </style>

@@ -1,64 +1,3 @@
-<template>
-  <div class="popoverlay" @click="handleClose">
-    <div class="popupview">
-      <div class="tituloload">
-        <IconExit class="iconexit" @click="handleClose"/>
-        <h1>{{ title }}</h1>
-      </div>
-
-      <!-- Mensagens de feedback -->
-      <div v-if="errorMessage" class="message error-message">
-        {{ errorMessage }}
-      </div>
-      <div v-if="successMessage" class="message success-message">
-        {{ successMessage }}
-      </div>
-
-      <!-- Área de upload -->
-      <div 
-        class="loadprocss"
-        :class="{ 'dragging': isDragging, 'has-file': selectedFile }"
-        @click="triggerFileInput"
-        @dragover.prevent="isDragging = true"
-        @dragleave.prevent="isDragging = false"
-        @drop.prevent="handleDrop"
-      >
-        <input
-          type="file"
-          ref="fileInput"
-          @change="handleFileSelect"
-          style="display: none"
-          :accept="accept"
-        />
-        
-        <IconLoadProcess class="icone-load-process" />
-        
-        <div v-if="!selectedFile" class="upload-text">
-          <p>Clique aqui ou arraste o arquivo</p>
-          <p class="file-format">{{ hintText }}</p>
-        </div>
-        
-        <div v-else class="file-info">
-          <p class="file-name">📄 {{ selectedFile.name }}</p>
-          <p class="file-size">{{ formatFileSize(selectedFile.size) }}</p>
-          <button @click.stop="clearFile" class="btn-remove-file">Remover</button>
-        </div>
-      </div>
-
-      <div class="bnt">
-        <button 
-          @click="handleUpload" 
-          :disabled="!selectedFile || isUploading"
-          class="btn-upload"
-        >
-          <span v-if="isUploading">Processando...</span>
-          <span v-else>{{ uploadLabel }}</span>
-        </button>
-      </div>
-    </div>
-  </div>
-</template>
-
 <script setup>
 import { ref } from 'vue'
 import IconLoadProcess from '@/components/icons/IconLoadProcess.vue'
@@ -69,15 +8,15 @@ const emit = defineEmits(['close', 'upload'])
 const props = defineProps({
   title: {
     type: String,
-    default: 'Carregar'
+    default: 'Carregar',
   },
   accept: {
     type: String,
-    default: '.csv,.xlsx,.xls,.xlsm'
+    default: '.csv,.xlsx,.xls,.xlsm',
   },
   allowedExtensions: {
     type: Array,
-    default: () => ['.csv', '.xls', '.xlsx', '.xlsm']
+    default: () => ['.csv', '.xls', '.xlsx', '.xlsm'],
   },
   allowedMimeTypes: {
     type: Array,
@@ -85,21 +24,21 @@ const props = defineProps({
       'text/csv',
       'application/vnd.ms-excel',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'application/vnd.ms-excel.sheet.macroEnabled.12'
-    ]
+      'application/vnd.ms-excel.sheet.macroEnabled.12',
+    ],
   },
   maxSizeMB: {
     type: Number,
-    default: 10
+    default: 10,
   },
   uploadLabel: {
     type: String,
-    default: 'Enviar Arquivo'
+    default: 'Enviar Arquivo',
   },
   hintText: {
     type: String,
-    default: 'Formatos aceitos: .xls, .xlsx, .xlsm ou .csv'
-  }
+    default: 'Formatos aceitos: .xls, .xlsx, .xlsm ou .csv',
+  },
 })
 
 const fileInput = ref(null)
@@ -108,6 +47,7 @@ const isDragging = ref(false)
 const isUploading = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
+const isVisible = ref(true)
 
 function triggerFileInput() {
   fileInput.value?.click()
@@ -131,27 +71,29 @@ function handleDrop(event) {
 function validateAndSetFile(file) {
   errorMessage.value = ''
   successMessage.value = ''
-  
-  // Validação de tipo
+
+
   const fileExtension = '.' + file.name.split('.').pop().toLowerCase()
-  
-  const normalizedAllowedExtensions = props.allowedExtensions.map(ext => ext.toLowerCase())
-  const normalizedAllowedMimeTypes = props.allowedMimeTypes.map(type => type.toLowerCase())
+
+  const normalizedAllowedExtensions = props.allowedExtensions.map((ext) => ext.toLowerCase())
+  const normalizedAllowedMimeTypes = props.allowedMimeTypes.map((type) => type.toLowerCase())
   const extensionAllowed = normalizedAllowedExtensions.includes(fileExtension)
-  const mimeAllowed = file.type ? normalizedAllowedMimeTypes.includes(file.type.toLowerCase()) : true
+  const mimeAllowed = file.type
+    ? normalizedAllowedMimeTypes.includes(file.type.toLowerCase())
+    : true
 
   if (!extensionAllowed && !mimeAllowed) {
     errorMessage.value = 'Formato de arquivo não permitido.'
     return
   }
-  
+
   // Validação de tamanho (10MB)
   const maxSize = props.maxSizeMB * 1024 * 1024
   if (file.size > maxSize) {
     errorMessage.value = `Arquivo muito grande. Tamanho máximo: ${props.maxSizeMB}MB.`
     return
   }
-  
+
   selectedFile.value = file
 }
 
@@ -169,26 +111,20 @@ function formatFileSize(bytes) {
   const k = 1024
   const sizes = ['Bytes', 'KB', 'MB', 'GB']
   const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i]
+  return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i]
 }
 
 async function handleUpload() {
   if (!selectedFile.value) return
-  
+
   isUploading.value = true
   errorMessage.value = ''
   successMessage.value = ''
-  
+
   try {
-    // Emite evento para o componente pai processar o upload
+
     emit('upload', selectedFile.value)
-    
-    // O componente pai deve fechar o popup após sucesso
-    // Se quiser fechar automaticamente, descomente:
-    // setTimeout(() => {
-    //   handleClose()
-    // }, 2000)
-    
+
   } catch (error) {
     console.error('Erro no upload:', error)
     errorMessage.value = 'Erro ao processar arquivo. Tente novamente.'
@@ -198,10 +134,71 @@ async function handleUpload() {
 }
 
 function handleClose() {
+  isVisible.value = false
+}
+
+function onAfterLeave() {
   clearFile()
   emit('close')
 }
 </script>
+
+<template>
+  <Transition name="modal-fade" appear @after-leave="onAfterLeave">
+    <div v-if="isVisible" class="popoverlay" @click="handleClose">
+      <div class="popupview" @click.stop>
+        <div class="tituloload">
+          <IconExit class="iconexit" @click="handleClose" />
+          <h1>{{ title }}</h1>
+        </div>
+
+        <div v-if="errorMessage" class="message error-message">
+          {{ errorMessage }}
+        </div>
+        <div v-if="successMessage" class="message success-message">
+          {{ successMessage }}
+        </div>
+
+        <div
+          class="loadprocss"
+          :class="{ dragging: isDragging, 'has-file': selectedFile }"
+          @click="triggerFileInput"
+          @dragover.prevent="isDragging = true"
+          @dragleave.prevent="isDragging = false"
+          @drop.prevent="handleDrop"
+        >
+          <input
+            type="file"
+            ref="fileInput"
+            @change="handleFileSelect"
+            style="display: none"
+            :accept="accept"
+          />
+
+          <IconLoadProcess class="icone-load-process" />
+
+          <div v-if="!selectedFile" class="upload-text">
+            <p>Clique aqui ou arraste o arquivo</p>
+            <p class="file-format">{{ hintText }}</p>
+          </div>
+
+          <div v-else class="file-info">
+            <p class="file-name">📄 {{ selectedFile.name }}</p>
+            <p class="file-size">{{ formatFileSize(selectedFile.size) }}</p>
+            <button @click.stop="clearFile" class="btn-remove-file">Remover</button>
+          </div>
+        </div>
+
+        <div class="bnt">
+          <button @click="handleUpload" :disabled="!selectedFile || isUploading" class="btn-upload">
+            <span v-if="isUploading">Processando...</span>
+            <span v-else>{{ uploadLabel }}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </Transition>
+</template>
 
 <style scoped>
 .popoverlay {
@@ -211,6 +208,7 @@ function handleClose() {
   width: 100%;
   height: 100%;
   background-color: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(2px);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -276,7 +274,7 @@ function handleClose() {
   max-width: 525px;
   height: 250px;
   border-radius: 20px;
-border: 2px solid #868686;
+  border: 2px solid #868686;
   font-size: 13px;
   font-weight: bolder;
   padding: 10px;
@@ -303,7 +301,6 @@ border: 2px solid #868686;
 .loadprocss.dragging {
   border: 2px dashed #2e7d32;
   background-color: #e8f5e9;
-
 }
 
 .loadprocss.has-file {
@@ -423,6 +420,38 @@ border: 2px solid #868686;
   transform: none;
 }
 
+.modal-fade-enter-active {
+  transition: opacity 0.3s ease-out;
+}
+
+.modal-fade-enter-active .popupview {
+  transition:
+    opacity 0.3s ease-out,
+    transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+
+.modal-fade-leave-active {
+  transition: opacity 0.2s ease-in;
+}
+
+.modal-fade-leave-active .popupview {
+  transition:
+    opacity 0.2s ease-in,
+    transform 0.2s ease-in;
+}
+
+
+.modal-fade-enter-from,
+.modal-fade-leave-to {
+  opacity: 0;
+}
+
+.modal-fade-enter-from .popupview,
+.modal-fade-leave-to .popupview {
+  opacity: 0;
+  transform: translateY(20px); 
+}
 @media (max-width: 768px) {
   .tituloload h1 {
     font-size: 1.5rem;

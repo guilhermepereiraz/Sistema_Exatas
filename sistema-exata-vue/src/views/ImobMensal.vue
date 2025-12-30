@@ -99,6 +99,7 @@ function adicionarParaTabela() {
 
   const novoItem = {
     ...contratoSelecionadoTemp.value,
+    localId: Date.now(),
     obs: '',
     status: '',
     statusOpen: false,
@@ -138,178 +139,202 @@ function formatMoney(value) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
 }
 </script>
+
 <template>
-  <Header_no_HR />
+  <div class="page-root">
+    <Header_no_HR />
 
-  <div class="confirmation-backdrop" v-if="isDeleteModalOpen" @click="fecharModalExclusao">
-    <div class="confirmation-window" @click.stop>
-      <div class="confirmation-heading">
-        <h1>Tem certeza que deseja <br> excluir esse contrato da sua <br> lista?</h1>
+    <Transition name="modal-fade">
+      <div class="confirmation-backdrop" v-if="isDeleteModalOpen" @click="fecharModalExclusao">
+        <div class="confirmation-window" @click.stop>
+          <div class="confirmation-heading">
+            <h1>
+              Tem certeza que deseja <br />
+              excluir esse contrato da sua <br />
+              lista?
+            </h1>
+          </div>
+
+          <div>
+            <span class="target-user-display">
+              ({{ itemToDelete ? itemToDelete.codigo_contrato : 'contrato' }})
+            </span>
+          </div>
+
+          <div class="confirmation-text">
+            <p>O contrato NÃO será excluir do banco de dados</p>
+          </div>
+
+          <div class="confirmation-actions">
+            <button class="action-button action-cancel" @click="fecharModalExclusao">Não</button>
+            <button class="action-button action-confirm" @click="confirmarExclusao">Sim</button>
+          </div>
+        </div>
       </div>
+    </Transition>
 
-      <div>
-        <span class="target-user-display">
-          ({{ itemToDelete ? itemToDelete.codigo_contrato : 'contrato' }})
-        </span>
-      </div>
+    <div class="div_main">
+      <div class="div_select">
+        <div class="setavoltar" @click="$router.go(-1)"><ArrowBack /></div>
 
-      <div class="confirmation-text">
-        <p>O contrato NÃO será excluir do banco de dados</p>
-      </div>
+        <div class="center-content">
+          <h1>Contratos</h1>
 
-      <div class="confirmation-actions">
-        <button class="action-button action-cancel" @click="fecharModalExclusao">Não</button>
-        <button class="action-button action-confirm" @click="confirmarExclusao">Sim</button>
-      </div>
-    </div>
-  </div>
+          <div class="search-container">
+            <input
+              type="text"
+              placeholder="Código do Contrato"
+              v-model="termoBusca"
+              @focus="mostrarLista = true"
+              @blur="fecharListaComDelay"
+            />
 
-  <div class="div_main">
-    <div class="div_select">
-      <div class="setavoltar" @click="$router.go(-1)"><ArrowBack /></div>
-
-      <div class="center-content">
-        <h1>Contratos</h1>
-
-        <div class="search-container">
-          <input
-            type="text"
-            placeholder="Código do Contrato"
-            v-model="termoBusca"
-            @focus="mostrarLista = true"
-            @blur="fecharListaComDelay"
-          />
-
-          <ul v-if="mostrarLista" class="dropdown-list">
-            <li
-              v-for="contrato in contratosFiltrados"
-              :key="contrato.id || contrato.codigo_contrato"
-              @click="selecionarContrato(contrato)"
-            >
-              <strong>{{ contrato.codigo_contrato }}</strong>
-              <span class="desc-preview" v-if="contrato.descricao">
-                - {{ contrato.descricao }}</span
+            <ul v-if="mostrarLista" class="dropdown-list">
+              <li
+                v-for="contrato in contratosFiltrados"
+                :key="contrato.id || contrato.codigo_contrato"
+                @click="selecionarContrato(contrato)"
               >
-            </li>
+                <strong>{{ contrato.codigo_contrato }}</strong>
+                <span class="desc-preview" v-if="contrato.descricao">
+                  - {{ contrato.descricao }}</span
+                >
+              </li>
 
-            <li v-if="contratosFiltrados.length === 0" class="no-result">
-              Nenhum contrato encontrado.
-            </li>
-          </ul>
+              <li v-if="contratosFiltrados.length === 0" class="no-result">
+                Nenhum contrato encontrado.
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="bntadd">
+          <button @click="adicionarParaTabela">Adicionar</button>
         </div>
       </div>
 
-      <div class="bntadd">
-        <button @click="adicionarParaTabela">Adicionar</button>
-      </div>
-    </div>
+      <div class="content-wrapper">
+        <div class="table-container">
+          <table class="custom-table">
+            <thead>
+              <tr class="trtable">
+                <th>Referência</th>
+                <th>Contrato</th>
+                <th>Desc. Contrato</th>
+                <th>Adm.</th>
+                <th>Fornecedor</th>
+                <th>Valor</th>
+                <th>Término</th>
+                <th style="width: 15%">Obs.</th>
 
-    <div class="content-wrapper">
-      <div class="table-container">
-        <table class="custom-table">
-          <thead>
-            <tr class="trtable">
-              <th>Referência</th>
-              <th>Contrato</th>
-              <th>Desc. Contrato</th>
-              <th>Adm.</th>
-              <th>Fornecedor</th>
-              <th>Valor</th>
-              <th>Término</th>
-              <th>Obs.</th>
-              <th>Status</th>
-              <th>Format</th>
-              <th>Excluir</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(item, index) in contratosAdicionados" :key="item.id || index">
-              <td>{{ item.referencia || '-' }}</td>
-              <td>{{ item.codigo_contrato }}</td>
-              <td class="col-desc">{{ item.descricao || '-' }}</td>
-              <td>{{ item.administrador || '-' }}</td>
-              <td>{{ item.fornecedor || '-' }}</td>
-              <td>{{ item.centro_custo ? formatMoney(item.valor) : '-' }}</td>
-              <td>{{ formatDate(item.data_termino) }}</td>
+                <th style="width: 170px">Status</th>
+                <th>Format</th>
+                <th>Excluir</th>
+              </tr>
+            </thead>
+            <TransitionGroup name="list" tag="tbody">
+              <tr
+                v-for="(item, index) in contratosAdicionados"
+                :key="item.localId || item.id || item.codigo_contrato"
+              >
+                <td>{{ item.referencia || '-' }}</td>
+                <td>{{ item.codigo_contrato }}</td>
+                <td class="col-desc">{{ item.descricao || '-' }}</td>
+                <td>{{ item.administrador || '-' }}</td>
+                <td>{{ item.fornecedor || '-' }}</td>
+                <td>{{ item.centro_custo ? formatMoney(item.valor) : '-' }}</td>
+                <td>{{ formatDate(item.data_termino) }}</td>
 
-              <td>
-                <input type="text" placeholder="Observação" class="tdobs" v-model="item.obs" />
-              </td>
-              <td class="status-cell">
-                <div class="custom-select-container">
-                  <div
-                    class="select-trigger"
-                    @click="toggleStatusMenu(item)"
-                    :class="{ placeholder: !item.status }"
-                  >
-                    <span>{{ item.status ? item.status : 'Selecione Status' }}</span>
-                    <span class="arrow-down">▼</span>
-                  </div>
-
-                  <div v-if="item.statusOpen" class="custom-options">
-                    <div class="option-item ativo" @click="selecionarStatus(item, 'Ativo')">
-                      <span class="dot">●</span> Ativo
-                    </div>
-
-                    <div class="option-item concluido" @click="selecionarStatus(item, 'Concluído')">
-                      <span class="dot">●</span> Concluído
-                    </div>
-
-                    <div class="option-item vencido" @click="selecionarStatus(item, 'Vencido')">
-                      <span class="dot">●</span> Vencido
-                    </div>
-
+                <td>
+                  <input type="text" placeholder="Observação" class="tdobs" v-model="item.obs" />
+                </td>
+                <td class="status-cell">
+                  <div class="custom-select-container">
                     <div
-                      class="option-item proximo"
-                      @click="selecionarStatus(item, 'Próximo Vencimento')"
+                      class="select-trigger"
+                      @click="toggleStatusMenu(item)"
+                      :class="{ placeholder: !item.status }"
                     >
-                      <span class="dot">●</span> Próx. Vencimento
+                      <span>{{ item.status ? item.status : 'Selecione Status' }}</span>
+                      <span class="arrow-down">▼</span>
+                    </div>
+
+                    <div v-if="item.statusOpen" class="custom-options">
+                      <div class="option-item ativo" @click="selecionarStatus(item, 'Ativo')">
+                        <span class="dot">●</span> Ativo
+                      </div>
+                      <div
+                        class="option-item concluido"
+                        @click="selecionarStatus(item, 'Concluído')"
+                      >
+                        <span class="dot">●</span> Concluído
+                      </div>
+                      <div class="option-item vencido" @click="selecionarStatus(item, 'Vencido')">
+                        <span class="dot">●</span> Vencido
+                      </div>
+                      <div
+                        class="option-item proximo"
+                        @click="selecionarStatus(item, 'Próximo Vencimento')"
+                      >
+                        <span class="dot">●</span> Próx. Vencimento
+                      </div>
                     </div>
                   </div>
-                </div>
-              </td>
+                </td>
 
-              <td>
-                <button class="btn-format" title="Visualizar Arquivo">
-                  <IconFormat />
-                </button>
-              </td>
-              <td class="col-actions">
-                <button class="btn-excluir" @click="removerItem(index)" title="Excluir">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
-                    <polyline points="3 6 5 6 21 6"></polyline>
-                    <path
-                      d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
-                    ></path>
-                    <line x1="10" y1="11" x2="10" y2="17"></line>
-                    <line x1="14" y1="11" x2="14" y2="17"></line>
-                  </svg>
-                </button>
-              </td>
-            </tr>
+                <td>
+                  <button class="btn-format" title="Visualizar Arquivo">
+                    <IconFormat />
+                  </button>
+                </td>
+                <td class="col-actions">
+                  <button class="btn-excluir" @click="removerItem(index)" title="Excluir">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <polyline points="3 6 5 6 21 6"></polyline>
+                      <path
+                        d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
+                      ></path>
+                      <line x1="10" y1="11" x2="10" y2="17"></line>
+                      <line x1="14" y1="11" x2="14" y2="17"></line>
+                    </svg>
+                  </button>
+                </td>
+              </tr>
 
-            <tr v-if="contratosAdicionados.length === 0">
-              <td colspan="11" class="empty-table-cell">
-                Nenhum contrato adicionado. Pesquise e clique em "Adicionar".
-              </td>
-            </tr>
-          </tbody>
-        </table>
+              <tr
+                v-if="contratosAdicionados.length === 0"
+                key="no-contracts-row"
+                class="static-row"
+              >
+                <td colspan="11" class="empty-table-cell">
+                  Nenhum contrato adicionado. Pesquise e clique em "Adicionar".
+                </td>
+              </tr>
+            </TransitionGroup>
+          </table>
+        </div>
       </div>
     </div>
   </div>
 </template>
+
 <style scoped>
+/* Classe para corrigir a transição do Vue e evitar tela branca */
+.page-root {
+  width: 100%;
+  min-height: 100vh;
+}
+
 .div_main {
   display: flex;
   flex-direction: column;
@@ -413,18 +438,21 @@ function formatMoney(value) {
 /* Container com scroll caso a tabela seja muito larga */
 .table-container {
   overflow-x: auto;
+  overflow-y: auto;
+  scroll-behavior: smooth;
   border-radius: 8px;
   border: 1px solid #e0e0e0;
   min-height: 200px; /* Define uma altura mínima fixa (ajuste conforme sua tela) */
   height: 63vh;
+  contain: paint;
 }
 
-/* Estilo da Tabela */
 .custom-table {
   width: 100%;
   border-collapse: collapse;
   background: white;
-  min-width: 1200px; /* Evita que esmague em telas pequenas */
+  min-width: 1200px;
+  table-layout: fixed;
 }
 
 /* Cabeçalho Verde */
@@ -822,5 +850,93 @@ function formatMoney(value) {
   background-color: rgba(209, 44, 44, 0.8);
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(139, 14, 14, 0.8);
+}
+
+.modal-fade-enter-active,
+.modal-fade-leave-active {
+  transition: opacity 0.3s ease-out;
+}
+
+.modal-fade-enter-active .confirmation-window {
+  transition:
+    opacity 0.3s ease-out,
+    transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.modal-fade-leave-active .confirmation-window {
+  transition:
+    opacity 0.2s ease-in,
+    transform 0.2s ease-in;
+}
+
+.modal-fade-enter-from,
+.modal-fade-leave-to {
+  opacity: 0;
+}
+
+.modal-fade-enter-from .confirmation-window,
+.modal-fade-leave-to .confirmation-window {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.list-enter-active,
+.list-leave-active {
+  transition:
+    opacity 0.3s ease,
+    background-color 0.3s ease;
+}
+
+/* 2. ENTRADA (Adicionar) */
+.list-enter-from {
+  opacity: 0;
+  background-color: #dcfce7; /* Verde claro ao nascer */
+}
+
+/* Durante a entrada, mantemos o verde um pouco para dar destaque */
+.list-enter-active {
+  background-color: #dcfce7;
+}
+
+.list-enter-to {
+  opacity: 1;
+  background-color: transparent; /* Volta ao branco suavemente */
+}
+
+/* 3. SAÍDA (Excluir) */
+.list-leave-from {
+  opacity: 1;
+  background-color: transparent;
+}
+
+.list-leave-active {
+  /* O truque: definimos a cor explicitamente durante a saída para não piscar */
+  background-color: #fee2e2; /* Vermelho claro ao morrer */
+}
+
+.list-leave-to {
+  opacity: 0;
+  background-color: #fee2e2;
+}
+
+/* Keyframes para garantir o flash de cor */
+@keyframes highlight-green {
+  0% {
+    background-color: rgba(46, 125, 50, 0.2);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.list-leave-active.static-row {
+  display: none; /* Some instantaneamente */
+  transition: none !important;
+}
+
+/* Garante que a mensagem de vazio não pisque verde ao aparecer de volta */
+.list-enter-active.static-row {
+  animation: none !important;
+  transition: opacity 0.3s ease; /* Apenas um fade suave simples */
 }
 </style>

@@ -4,7 +4,8 @@ import { RouterView } from 'vue-router'
 
 <template>
   <RouterView v-slot="{ Component }">
-    <Transition name="page-fade" mode="out-in">
+    <Transition>
+       <!-- <Transition name="page-fade" mode="out-in"> -->
       <component :is="Component" />
     </Transition>
   </RouterView>
@@ -25,6 +26,7 @@ import { RouterView } from 'vue-router'
   transition:
     opacity 0.4s ease,
     transform 0.4s ease;
+ 
 }
 
 
@@ -32,6 +34,7 @@ import { RouterView } from 'vue-router'
 .page-fade-leave-to {
   opacity: 0;
   transform: translateY(10px); 
+  overflow: hidden;
 }
 
 
@@ -39,5 +42,6 @@ import { RouterView } from 'vue-router'
 .page-fade-leave-from {
   opacity: 1;
   transform: translateY(0);
+  overflow: hidden;
 }
 </style>

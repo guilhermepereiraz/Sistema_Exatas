@@ -320,217 +320,208 @@ function formatMoney(value) {
 </script>
 
 <template>
-  <!-- 
-    Div principal agora impede o overflow da PÁGINA 
-  -->
-  <div class="admin-panel">
-    <HeaderNoHR />
+  <div class="page-root">
+    <div class="admin-panel">
+      <HeaderNoHR />
 
-    <main class="admin-content">
-      <h2 class="h2projeto">Projetos</h2>
+      <main class="admin-content">
+        <h2 class="h2projeto">Projetos</h2>
 
-      <div v-if="uploadFeedback.message" :class="['upload-feedback', uploadFeedback.type]">
-        <span>{{ uploadFeedback.message }}</span>
-        <button
-          class="upload-feedback-close"
-          @click="uploadFeedback = { type: '', message: '' }"
-          title="Fechar alerta"
-        >
-          ✕
-        </button>
-      </div>
+        <div v-if="uploadFeedback.message" :class="['upload-feedback', uploadFeedback.type]">
+          <span>{{ uploadFeedback.message }}</span>
+          <button
+            class="upload-feedback-close"
+            @click="uploadFeedback = { type: '', message: '' }"
+            title="Fechar alerta"
+          >
+            ✕
+          </button>
+        </div>
 
-      <Transition name="slide-fade">
-        <div v-if="divisaoFiltro" class="floating-filter-badge">
-          <div class="filter-content">
-            <span class="filter-icon">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
+        <Transition name="slide-fade">
+          <div v-if="divisaoFiltro" class="floating-filter-badge">
+            <div class="filter-content">
+              <span class="filter-icon">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+                </svg>
+              </span>
+              <span class="filter-text">
+                Filtro: <strong>{{ nomeDivisao }}</strong>
+              </span>
+              <button @click="removerFiltroDivisao" class="btn-close-filter" title="Remover filtro">
+                ✕
+              </button>
+            </div>
+          </div>
+        </Transition>
+
+        <div class="admin-card">
+          <div class="users-section">
+            <div class="table-container">
+              <div v-if="isLoadingContratos" class="loading-users">
+                <div class="loading-spinner"></div>
+                <span>Carregando contratos...</span>
+              </div>
+
+              <div v-else-if="errorMessage" class="no-users">
+                <div class="no-users-content">
+                  <h4>{{ errorMessage }}</h4>
+                  <p>Verifique sua conexão ou tente recarregar.</p>
+                </div>
+              </div>
+
+              <table v-else class="users-table">
+                <thead>
+                  <tr>
+                    <th style="text-align: center; width: 5%">PEP</th>
+                    <th style="text-align: center; width: 8%">IEA</th>
+                    <th style="text-align: center; width: 8%">Divisão</th>
+                    <th style="text-align: center; width: 8%">Término</th>
+                    <th style="text-align: center; width: 10%">Concluído</th>
+                    <th style="text-align: center; width: 10%">Adm</th>
+                    <th style="text-align: center; width: 10%">Fornecedor</th>
+                    <th style="text-align: center; width: 8%">Referência</th>
+                    <th style="text-align: center; width: 8%">Contrato</th>
+
+                    <th style="text-align: center; width: 15%">Descrição</th>
+                    <th style="text-align: center; width: 10%">Obs</th>
+
+                    <th style="text-align: center; width: 10%">Valor Contábil</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="contrato in contratos" :key="contrato.id">
+                    <td>{{ contrato.pep_id || '-' }}</td>
+                    <td>{{ contrato.IEA || '-' }}</td>
+                    <td>{{ contrato.divisao_id || '-' }}</td>
+                    <td>{{ formatDate(contrato.termino) }}</td>
+
+                    <td>
+                      <span class="status" :class="getStatusLabel(contrato.concluido)">
+                        {{ getStatusLabel(contrato.concluido) }}
+                      </span>
+                    </td>
+
+                    <td>{{ contrato.administrador || '-' }}</td>
+                    <td>{{ contrato.fornecedor || '-' }}</td>
+                    <td>{{ contrato.referencia || '-' }}</td>
+                    <td>
+                      <strong>{{ contrato.codigo_contrato || '-' }}</strong>
+                    </td>
+
+                    <td class="col-desc" :title="contrato.descricao">
+                      <div class="text-clamp">{{ contrato.descricao || '-' }}</div>
+                    </td>
+
+                    <td class="col-obs" :title="contrato.observacao">
+                      <div class="text-clamp">{{ contrato.observacao || '-' }}</div>
+                    </td>
+
+                    <td style="white-space: nowrap">{{ formatMoney(contrato.valor_contabil) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <div
+                v-if="!isLoadingContratos && contratos.length === 0 && !errorMessage"
+                class="no-users"
               >
-                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
-              </svg>
-            </span>
-            <span class="filter-text">
-              Filtro: <strong>{{ nomeDivisao }}</strong>
-            </span>
-            <button @click="removerFiltroDivisao" class="btn-close-filter" title="Remover filtro">
-              ✕
-            </button>
-          </div>
-        </div>
-      </Transition>
-
-      <div class="admin-card">
-        <div class="users-section">
-          <!-- <div class="users-header">
-            <button @click="loadContratos" class="reload-btn" :disabled="isLoadingContratos">
-              <span v-if="isLoadingContratos">🔄</span>
-              <span v-else>↻</span>
-              Recarregar
-            </button>
-          </div> -->
-          <div class="table-container">
-            <div v-if="isLoadingContratos" class="loading-users">
-              <div class="loading-spinner"></div>
-              <span>Carregando contratos...</span>
-            </div>
-
-            <div v-else-if="errorMessage" class="no-users">
-              <div class="no-users-content">
-                <h4>{{ errorMessage }}</h4>
-                <p>Verifique sua conexão ou tente recarregar.</p>
-              </div>
-            </div>
-
-            <table v-else class="users-table">
-              <thead>
-                <tr>
-                  <th style="text-align: center; width: 5%">PEP</th>
-                  <th style="text-align: center; width: 8%">IEA</th>
-                  <th style="text-align: center; width: 8%">Divisão</th>
-                  <th style="text-align: center; width: 8%">Término</th>
-                  <th style="text-align: center; width: 10%">Concluído</th>
-                  <th style="text-align: center; width: 10%">Adm</th>
-                  <th style="text-align: center; width: 10%">Fornecedor</th>
-                  <th style="text-align: center; width: 8%">Referência</th>
-                  <th style="text-align: center; width: 8%">Contrato</th>
-
-                  <th style="text-align: center; width: 15%">Descrição</th>
-                  <th style="text-align: center; width: 10%">Obs</th>
-
-                  <th style="text-align: center; width: 10%">Valor Contábil</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="contrato in contratos" :key="contrato.id">
-                  <td>{{ contrato.pep_id || '-' }}</td>
-                  <td>{{ contrato.IEA || '-' }}</td>
-                  <td>{{ contrato.divisao_id || '-' }}</td>
-                  <td>{{ formatDate(contrato.termino) }}</td>
-
-                  <td>
-                    <span class="status" :class="getStatusLabel(contrato.concluido)">
-                      {{ getStatusLabel(contrato.concluido) }}
-                    </span>
-                  </td>
-
-                  <td>{{ contrato.administrador || '-' }}</td>
-                  <td>{{ contrato.fornecedor || '-' }}</td>
-                  <td>{{ contrato.referencia || '-' }}</td>
-                  <td>
-                    <strong>{{ contrato.codigo_contrato || '-' }}</strong>
-                  </td>
-
-                  <td class="col-desc" :title="contrato.descricao">
-                    <div class="text-clamp">{{ contrato.descricao || '-' }}</div>
-                  </td>
-
-                  <td class="col-obs" :title="contrato.observacao">
-                    <div class="text-clamp">{{ contrato.observacao || '-' }}</div>
-                  </td>
-
-                  <td style="white-space: nowrap">{{ formatMoney(contrato.valor_contabil) }}</td>
-                </tr>
-              </tbody>
-            </table>
-
-            <div
-              v-if="!isLoadingContratos && contratos.length === 0 && !errorMessage"
-              class="no-users"
-            >
-              <div class="no-users-content">
-                <h4>Nenhum contrato cadastrado</h4>
-                <p>Nenhum contrato encontrado no banco de dados.</p>
+                <div class="no-users-content">
+                  <h4>Nenhum contrato cadastrado</h4>
+                  <p>Nenhum contrato encontrado no banco de dados.</p>
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
-      <!-- Controles de Paginação -->
-      <div v-if="!isLoadingContratos && contratos.length > 0" class="pagination-container">
-        <div class="pagination-info">
-          <span>
-            Mostrando {{ getContratosRange().start }} a {{ getContratosRange().end }} de
-            {{ totalContratos }} contrato{{ totalContratos !== 1 ? 's' : '' }}
-          </span>
-        </div>
+        <div v-if="!isLoadingContratos && contratos.length > 0" class="pagination-container">
+          <div class="pagination-info">
+            <span>
+              Mostrando {{ getContratosRange().start }} a {{ getContratosRange().end }} de
+              {{ totalContratos }} contrato{{ totalContratos !== 1 ? 's' : '' }}
+            </span>
+          </div>
 
-        <div class="pagination-controls">
-          <button
-            @click="goToPage(currentPage - 1)"
-            :disabled="currentPage === 1 || isLoadingContratos"
-            class="pagination-btn"
-            title="Página anterior"
-          >
-            ← Anterior
-          </button>
-
-          <div class="pagination-pages">
+          <div class="pagination-controls">
             <button
-              v-for="page in getPageNumbers()"
-              :key="page"
-              @click="goToPage(page)"
-              :disabled="isLoadingContratos"
-              :class="[
-                'pagination-page-btn',
-                { active: page === currentPage, ellipsis: page === '...' },
-              ]"
+              @click="goToPage(currentPage - 1)"
+              :disabled="currentPage === 1 || isLoadingContratos"
+              class="pagination-btn"
+              title="Página anterior"
             >
-              {{ page }}
+              ← Anterior
+            </button>
+
+            <div class="pagination-pages">
+              <button
+                v-for="page in getPageNumbers()"
+                :key="page"
+                @click="goToPage(page)"
+                :disabled="isLoadingContratos"
+                :class="[
+                  'pagination-page-btn',
+                  { active: page === currentPage, ellipsis: page === '...' },
+                ]"
+              >
+                {{ page }}
+              </button>
+            </div>
+
+            <button
+              @click="goToPage(currentPage + 1)"
+              :disabled="currentPage >= totalPages || isLoadingContratos || totalPages <= 1"
+              class="pagination-btn"
+              title="Próxima página"
+            >
+              Próxima →
             </button>
           </div>
-
-          <button
-            @click="goToPage(currentPage + 1)"
-            :disabled="currentPage >= totalPages || isLoadingContratos || totalPages <= 1"
-            class="pagination-btn"
-            title="Próxima página"
-          >
-            Próxima →
-          </button>
         </div>
-      </div>
 
-      <div class="div_proximo">
-        <button class="bnt_proximo" @click="irParaImobMensal">Próximo</button>
-      </div>
-    </main>
+        <div class="div_proximo">
+          <button class="bnt_proximo" @click="irParaImobMensal">Próximo</button>
+        </div>
+      </main>
 
-    <!-- Popup de upload de contrato -->
-    <PopupLoadView
-      v-if="showUploadPopup"
-      :title="`Upload do contrato ${contratoSelecionado ? contratoSelecionado.codigo_contrato : ''}`"
-      :accept="'.pdf,.doc,.docx,.xls,.xlsx'"
-      :allowed-extensions="['.pdf', '.doc', '.docx', '.xls', '.xlsx']"
-      :allowed-mime-types="[
-        'application/pdf',
-        'application/msword',
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'application/vnd.ms-excel',
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      ]"
-      :max-size-m-b="15"
-      upload-label="Enviar Contrato"
-      hint-text="Formatos: PDF, DOC, DOCX, XLS, XLSX (até 15MB)"
-      @close="fecharUploadPopup"
-      @upload="handleContratoUpload"
-    />
+      <PopupLoadView
+        v-if="showUploadPopup"
+        :title="`Upload do contrato ${contratoSelecionado ? contratoSelecionado.codigo_contrato : ''}`"
+        :accept="'.pdf,.doc,.docx,.xls,.xlsx'"
+        :allowed-extensions="['.pdf', '.doc', '.docx', '.xls', '.xlsx']"
+        :allowed-mime-types="[
+          'application/pdf',
+          'application/msword',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          'application/vnd.ms-excel',
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ]"
+        :max-size-m-b="15"
+        upload-label="Enviar Contrato"
+        hint-text="Formatos: PDF, DOC, DOCX, XLS, XLSX (até 15MB)"
+        @close="fecharUploadPopup"
+        @upload="handleContratoUpload"
+      />
+    </div>
   </div>
 </template>
 
 <style scoped>
-/* --- ESTILOS GERAIS --- */
-
-/* NOVA REGRA: Impede que a PÁGINA inteira tenha scroll horizontal 
-*/
+/* Classe para corrigir a transição do Vue e evitar tela branca */
+.page-root {
+  width: 100%;
+  min-height: 100vh;
+}
 
 td {
   text-align: center;

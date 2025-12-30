@@ -7,25 +7,21 @@ import HeaderPrincipal from './Header_Principal.vue'
 
 const router = useRouter()
 
-// Estados do popup de divisão
 const showDivisaoPopup = ref(false)
 const divisaoSelecionada = ref(null)
 const divisoes = ref([])
 const isLoadingDivisoes = ref(false)
 const errorMessage = ref('')
 
-// Verifica se o usuário é admin
 const isAdmin = computed(() => {
   const user = authService.getCurrentUser()
   return user?.nivel_acesso === 'admin'
 })
 
-// Carrega dados do usuário ao montar
 onMounted(() => {
   loadDivisoes()
 })
 
-// Função para carregar divisões da API
 async function loadDivisoes() {
   try {
     isLoadingDivisoes.value = true
@@ -33,10 +29,6 @@ async function loadDivisoes() {
 
     const response = await divisaoApi.getDivisoes()
     console.log('Resposta da API de divisões:', response.data)
-
-    // A API pode retornar de diferentes formas:
-    // 1. Array direto: [{id: 1, nome: '...'}, ...]
-    // 2. Objeto com data: {data: [{id: 1, nome: '...'}, ...]}
 
     if (Array.isArray(response.data)) {
       divisoes.value = response.data
@@ -64,7 +56,6 @@ function irParaAdmin() {
 }
 
 function irParaContrato(divisaoId = null) {
-  // Se divisaoId foi fornecido, passa como query parameter
   if (divisaoId) {
     router.push({
       name: 'contrato',
@@ -81,19 +72,12 @@ async function handleImobilizacaoClick() {
 
   console.log('Nível de acesso do usuário:', nivelAcesso)
 
-  // Se for exata ou admin, mostra popup para selecionar divisão
   if (nivelAcesso === 'exata' || nivelAcesso === 'admin') {
-    // --- MUDANÇA AQUI ---
-    // Removemos o 'loadDivisoes()'. Usamos os dados que já carregaram no onMounted.
     showDivisaoPopup.value = true
     divisaoSelecionada.value = null
-  }
-  // Se for sabesp, vai direto sem popup
-  else if (nivelAcesso === 'sabesp') {
+  } else if (nivelAcesso === 'sabesp') {
     irParaContrato()
-  }
-  // Para outros níveis
-  else {
+  } else {
     irParaContrato()
   }
 }
@@ -112,88 +96,94 @@ function cancelarDivisao() {
 </script>
 
 <template>
-  <HeaderPrincipal />
-  <div class="home">
-    <img src="/Imagens/Imagem_admin_painel.png" alt="" class="img_princ" />
-  </div>
-  <div class="home_white">
-    <div class="buttons">
-      <button class="bnt_imob" @click="handleImobilizacaoClick">Imobilização</button>
-      <button
-        class="bnt_admin"
-        :class="{ disabled: !isAdmin }"
-        @click="irParaAdmin"
-        :disabled="!isAdmin"
-        :title="!isAdmin ? 'Acesso restrito a administradores' : 'Painel do Administrador'"
-      >
-        Painel do Administrador
-      </button>
+  <div class="page-root">
+    <HeaderPrincipal />
+
+    <div class="home">
+      <img src="/Imagens/Imagem_admin_painel.png" alt="" class="img_princ" />
     </div>
 
-    <hr class="hr_baixo" />
-  </div>
+    <div class="home_white">
+      <div class="buttons">
+        <button class="bnt_imob" @click="handleImobilizacaoClick">Imobilização</button>
+        <button
+          class="bnt_admin"
+          :class="{ disabled: !isAdmin }"
+          @click="irParaAdmin"
+          :disabled="!isAdmin"
+          :title="!isAdmin ? 'Acesso restrito a administradores' : 'Painel do Administrador'"
+        >
+          Painel do Administrador
+        </button>
+      </div>
 
-  <!-- Popup de Seleção de Divisão -->
-  <div v-if="showDivisaoPopup" class="modal-overlay" @click.self="cancelarDivisao">
-    <div class="modal-content-divisao" @click.stop>
-      <!-- <div class="modal-header-divisao">
-        <h2>Escolha o polo responsável</h2>
-        <button @click="cancelarDivisao" class="close-btn-divisao">&times;</button>
-      </div> -->
+      <hr class="hr_baixo" />
+    </div>
 
-      <div class="modal-body-divisao">
-        <div class="titulomodaldiv">
-          <h2>Escolha o polo responsável</h2>
-          <p class="modal-description-divisao">Selecione a divisão para acessar a imobilização:</p>
-        </div>
+  <Transition name="modal-fade">
+    <div v-if="showDivisaoPopup" class="modal-overlay" @click.self="cancelarDivisao">
+      <div class="modal-content-divisao" @click.stop>
+        <div class="modal-body-divisao">
+          <div class="titulomodaldiv">
+            <h2>Escolha o polo responsável</h2>
+            <p class="modal-description-divisao">
+              Selecione a divisão para acessar a imobilização:
+            </p>
+          </div>
 
-        <div v-if="isLoadingDivisoes" class="loading-divisoes">
-          <div class="loading-spinner-divisao"></div>
-          <span>Carregando divisões...</span>
-        </div>
+          <div v-if="isLoadingDivisoes" class="loading-divisoes">
+            <div class="loading-spinner-divisao"></div>
+            <span>Carregando divisões...</span>
+          </div>
 
-        <div v-else-if="errorMessage" class="error-message-divisao">
-          {{ errorMessage }}
-          <button @click="loadDivisoes" class="btn-recarregar-divisoes">🔄 Tentar Novamente</button>
-        </div>
+          <div v-else-if="errorMessage" class="error-message-divisao">
+            {{ errorMessage }}
+            <button @click="loadDivisoes" class="btn-recarregar-divisoes">
+              🔄 Tentar Novamente
+            </button>
+          </div>
 
-        <div v-else-if="divisoes.length === 0" class="no-divisoes">
-          <p>Nenhuma divisão disponível.</p>
-          <button @click="loadDivisoes" class="btn-recarregar-divisoes">🔄 Recarregar</button>
-        </div>
+          <div v-else-if="divisoes.length === 0" class="no-divisoes">
+            <p>Nenhuma divisão disponível.</p>
+            <button @click="loadDivisoes" class="btn-recarregar-divisoes">🔄 Recarregar</button>
+          </div>
 
-        <div v-else class="divisao-select-container">
-          <select v-model="divisaoSelecionada" class="divisao-select" :disabled="isLoadingDivisoes">
-            <option value="" disabled selected>Selecione uma divisão</option>
-            <option v-for="divisao in divisoes" :key="divisao.id" :value="divisao.id">
-              ID: {{ divisao.id }} - {{ divisao.nome }}
-            </option>
-          </select>
-        </div>
+          <div v-else class="divisao-select-container">
+            <select
+              v-model="divisaoSelecionada"
+              class="divisao-select"
+              :disabled="isLoadingDivisoes"
+            >
+              <option value="" disabled selected>Selecione uma divisão</option>
+              <option v-for="divisao in divisoes" :key="divisao.id" :value="divisao.id">
+                ID: {{ divisao.id }} - {{ divisao.nome }}
+              </option>
+            </select>
+          </div>
 
-        <div class="modal-actions-divisao">
-          <!-- <button
-            type="button"
-            @click="cancelarDivisao"
-            class="btn-cancelar-divisao"
-          >
-            Cancelar
-          </button> -->
-          <button
-            type="button"
-            @click="confirmarDivisao"
-            class="btn-confirmar-divisao"
-            :disabled="!divisaoSelecionada"
-          >
-            Proxímo
-          </button>
+          <div class="modal-actions-divisao">
+            <button
+              type="button"
+              @click="confirmarDivisao"
+              class="btn-confirmar-divisao"
+              :disabled="!divisaoSelecionada"
+            >
+              Próximo
+            </button>
+          </div>
         </div>
       </div>
     </div>
+  </Transition>
   </div>
 </template>
 
 <style scoped>
+.page-root {
+  width: 100%;
+  min-height: 100vh;
+}
+
 .buttons {
   display: flex;
   justify-content: space-around;
@@ -298,18 +288,17 @@ img {
 
 .div_info_inv {
   background-color: white;
-  position: absolute; /* Posiciona em relação ao pai (.dados_usuarios) */
-  top: 100%; /* Começa exatamente onde o pai termina (embaixo) */
-  right: 0; /* Alinha à direita do pai */
-  margin-top: 8px; /* Cria um pequeno espaço entre o header e o menu */
-
-  width: 250px; /* Defina uma largura fixa para o menu */
-  color: #333; /* Cor escura para o texto */
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 8px;
+  width: 250px;
+  color: #333;
   font-size: 16px;
   text-align: center;
   padding: 10px;
   border-radius: 0px 0px 20px 20px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); /* Sombra suave */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   z-index: 10;
 }
 
@@ -324,10 +313,6 @@ img {
   cursor: pointer;
 }
 
-@media (max-width: 768px) {
-}
-
-/* --- Modal de Seleção de Divisão --- */
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -335,6 +320,7 @@ img {
   right: 0;
   bottom: 0;
   background-color: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(2px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -352,7 +338,6 @@ img {
   max-height: 90vh;
   overflow-y: hidden;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-  /* animation: slideIn 0.3s ease-out; */
 }
 
 @keyframes slideIn {
@@ -575,7 +560,36 @@ img {
   cursor: not-allowed;
 }
 
-/* Responsividade do Modal */
+.modal-fade-enter-active {
+  transition: opacity 0.3s ease-out;
+}
+
+.modal-fade-enter-active .modal-content-divisao {
+  transition: opacity 0.3s ease-out, transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+
+.modal-fade-leave-active {
+  transition: opacity 0.2s ease-in;
+}
+
+.modal-fade-leave-active .modal-content-divisao {
+  transition: opacity 0.2s ease-in, transform 0.2s ease-in;
+}
+
+
+.modal-fade-enter-from,
+.modal-fade-leave-to {
+  opacity: 0;
+}
+
+
+.modal-fade-enter-from .modal-content-divisao,
+.modal-fade-leave-to .modal-content-divisao {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
 @media (max-width: 600px) {
   .modal-content-divisao {
     max-width: 100%;

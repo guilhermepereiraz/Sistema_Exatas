@@ -11,6 +11,8 @@ const password = ref('')
 
 const isLoading = ref(false)
 const errorMessage = ref('')
+const toastType = ref('error')
+const toastTimer = ref(null)
 
 const showCadastroModal = ref(false)
 const nomeSolicitacao = ref('')
@@ -18,10 +20,8 @@ const motivoSolicitacao = ref('')
 const isLoadingSolicitacao = ref(false)
 const successMessage = ref('')
 const errorSolicitacao = ref('')
-const toastTimer = ref(null)
-const toastType = ref('error')
 
-const isFormValid = ref(false) //
+const isFormValid = ref(false)
 
 const validateForm = () => {
   isFormValid.value = email.value.trim() !== '' && password.value.trim() !== ''
@@ -30,13 +30,13 @@ const validateForm = () => {
 function isEmailNotRegistered(error) {
   const status = error.response?.status
   const message = error.response?.data?.message || error.message || ''
-  const errorMessage = message.toLowerCase()
+  const errorMessageLower = message.toLowerCase()
 
   return (
     status === 404 ||
-    errorMessage.includes('não encontrado') ||
-    errorMessage.includes('não cadastrado') ||
-    errorMessage.includes('email não existe')
+    errorMessageLower.includes('não encontrado') ||
+    errorMessageLower.includes('não cadastrado') ||
+    errorMessageLower.includes('email não existe')
   )
 }
 
@@ -48,7 +48,7 @@ function exibirToast(mensagem, tipo = 'error') {
 
   toastTimer.value = setTimeout(() => {
     errorMessage.value = ''
-  }, 2000)
+  }, 4000)
 }
 
 async function fazerLogin() {
@@ -65,31 +65,22 @@ async function fazerLogin() {
       password: password.value,
     }
 
-
     await authService.login(credentials)
-
 
     const elapsedTime = Date.now() - startTime
     if (elapsedTime < 3000) {
-  
-      await new Promise(resolve => setTimeout(resolve, 3000 - elapsedTime))
+      await new Promise((resolve) => setTimeout(resolve, 3000 - elapsedTime))
     }
-
 
     exibirToast('Login realizado com sucesso!', 'success')
 
+    await new Promise((resolve) => setTimeout(resolve, 1500))
 
-    await new Promise(resolve => setTimeout(resolve, 2000))
-
-    // Redireciona
     router.push('/home')
-
   } catch (error) {
-    // --- ERRO ---
-    
     const elapsedTime = Date.now() - startTime
     if (elapsedTime < 3000) {
-      await new Promise(resolve => setTimeout(resolve, 3000 - elapsedTime))
+      await new Promise((resolve) => setTimeout(resolve, 3000 - elapsedTime))
     }
 
     isLoading.value = false
@@ -100,9 +91,8 @@ async function fazerLogin() {
       showCadastroModal.value = true
       nomeSolicitacao.value = ''
       motivoSolicitacao.value = ''
-      errorMessage.value = '' 
+      errorMessage.value = ''
     } else {
-
       const msg = error.response?.data?.message || error.message || 'Erro ao fazer login.'
       exibirToast(msg, 'error')
     }
@@ -126,7 +116,7 @@ async function enviarSolicitacaoCadastro() {
       motivoSolicitacao.value.trim() || null,
     )
 
-    successMessage.value = 'Solicitação enviada com sucesso! Entraremos em contato em breve.'
+    successMessage.value = 'Solicitação enviada com sucesso! Entraremos em contato.'
 
     setTimeout(() => {
       showCadastroModal.value = false
@@ -136,8 +126,7 @@ async function enviarSolicitacaoCadastro() {
     }, 3000)
   } catch (error) {
     console.error('Erro ao enviar solicitação:', error)
-    errorSolicitacao.value =
-      error.response?.data?.message || 'Erro ao enviar solicitação. Tente novamente.'
+    errorSolicitacao.value = error.response?.data?.message || 'Erro ao enviar solicitação.'
   } finally {
     isLoadingSolicitacao.value = false
   }
@@ -150,182 +139,170 @@ function fecharModalCadastro() {
   errorSolicitacao.value = ''
   successMessage.value = ''
 }
-
-function recuperarSenha() {
-  console.log('Recuperação de senha ainda não implementada')
-}
 </script>
 
 <template>
-  <Transition name="toast-slide">
-    <div v-if="errorMessage" class="toast-notification" :class="toastType">
-      <div class="toast-icon">
-        <svg
-          v-if="toastType === 'error'"
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-        >
-          <circle cx="12" cy="12" r="10"></circle>
-          <line x1="12" y1="8" x2="12" y2="12"></line>
-          <line x1="12" y1="16" x2="12.01" y2="16"></line>
-        </svg>
+  <div class="page-root">
+    <Transition name="toast-slide">
+      <div v-if="errorMessage" class="toast-notification" :class="toastType">
+        <div class="toast-icon">
+          <svg
+            v-if="toastType === 'error'"
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          </svg>
 
-        <svg
-          v-else
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="3"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        >
-          <polyline points="20 6 9 17 4 12"></polyline>
-        </svg>
+          <svg
+            v-else
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="3"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+        </div>
+        <div class="toast-content">
+          <span class="toast-title">{{ toastType === 'success' ? 'Sucesso' : 'Atenção' }}</span>
+          <span class="toast-message">{{ errorMessage }}</span>
+        </div>
+        <button class="toast-close" @click="errorMessage = ''">✕</button>
       </div>
-      <div class="toast-content">
-        <span class="toast-title">{{ toastType === 'success' ? 'Sucesso' : 'Atenção' }}</span>
-        <span class="toast-message">{{ errorMessage }}</span>
-      </div>
-      <button class="toast-close" @click="errorMessage = ''">✕</button>
-    </div>
-  </Transition>
+    </Transition>
 
-  <div class="container">
-    <div class="login-form">
-      <Transition name="form-fade" mode="out-in">
-        <div v-if="!isLoading" key="form-content" class="form-wrapper">
-          <form @submit.prevent="fazerLogin">
-            <h1>Acesse sua Conta</h1>
+    <div class="container">
+      <div class="login-form">
+        <Transition name="form-fade" mode="out-in">
+          <div v-if="!isLoading" key="form-content" class="form-wrapper">
+            <form @submit.prevent="fazerLogin">
+              <h1>Acesse sua Conta</h1>
 
-            <div class="campo-flutuante">
-              <input
-                id="email"
-                v-model="email"
-                @input="validateForm"
-                type="email"
-                class="input_class"
-                placeholder=" "
-                required
-                :disabled="isLoading"
-              />
-              <label for="email" class="label-flutuante">E-mail</label>
-            </div>
+              <div class="campo-flutuante">
+                <input
+                  id="email"
+                  v-model="email"
+                  @input="validateForm"
+                  type="email"
+                  class="input_class"
+                  placeholder=" "
+                  required
+                  :disabled="isLoading"
+                />
+                <label for="email" class="label-flutuante">E-mail</label>
+              </div>
 
-            <div class="campo-flutuante">
-              <input
-                id="password"
-                v-model="password"
-                @input="validateForm"
-                type="password"
-                class="input_class"
-                placeholder=" "
-                required
-                :disabled="isLoading"
-              />
-              <label for="password" class="label-flutuante">Senha</label>
-            </div>
+              <div class="campo-flutuante">
+                <input
+                  id="password"
+                  v-model="password"
+                  @input="validateForm"
+                  type="password"
+                  class="input_class"
+                  placeholder=" "
+                  required
+                  :disabled="isLoading"
+                />
+                <label for="password" class="label-flutuante">Senha</label>
+              </div>
 
-            <div class="forgot-password">Esqueci minha senha</div>
+              <div class="forgot-password">Esqueci minha senha</div>
 
-            <button type="submit" class="buttonentre" :disabled="isLoading || !isFormValid">
-              Entrar
-            </button>
-          </form>
-        </div>
-
-        <div v-else key="loading-content" class="loading-container">
-          <div class="spinner"></div>
-          <p>Autenticando...</p>
-        </div>
-      </Transition>
-    </div>
-
-    <div class="cadastro-form">
-      <img src="/Imagens/E__3_-removebg-preview (1).png" alt="Logo da Empresa" />
-      <h3>Não possui acesso ainda?</h3>
-      <button @click="showCadastroModal = true">Enviar E-mail</button>
-    </div>
-
-    <div v-if="showCadastroModal" class="modal-overlay" @click.self="fecharModalCadastro">
-      <div class="modal-content" @click.stop>
-        <div class="modal-header">
-          <h2>Solicitar Cadastro</h2>
-          <button @click="fecharModalCadastro" class="close-btn">&times;</button>
-        </div>
-
-        <div class="modal-body">
-          <p class="modal-description">
-            Seu email não está cadastrado no sistema. Preencha os dados abaixo para solicitar
-            acesso.
-          </p>
-
-          <div v-if="errorSolicitacao" class="error-message-modal">
-            {{ errorSolicitacao }}
-          </div>
-          <div v-if="successMessage" class="success-message-modal">
-            {{ successMessage }}
+              <button type="submit" class="buttonentre" :disabled="isLoading || !isFormValid">
+                Entrar
+              </button>
+            </form>
           </div>
 
-          <form @submit.prevent="enviarSolicitacaoCadastro">
-            <div class="form-group">
-              <label for="email-solicitacao">E-mail *</label>
-              <input
-                type="email"
-                id="email-solicitacao"
-                v-model="email"
-                required
-                :disabled="isLoadingSolicitacao"
-                placeholder="seu@email.com"
-              />
-            </div>
+          <div v-else key="loading-content" class="loading-container">
+            <div class="spinner"></div>
+            <p>Entrando...</p>
+          </div>
+        </Transition>
+      </div>
 
-            <div class="form-group">
-              <label for="nome-solicitacao">Nome Completo</label>
-              <input
-                type="text"
-                id="nome-solicitacao"
-                v-model="nomeSolicitacao"
-                :disabled="isLoadingSolicitacao"
-                placeholder="Seu nome completo (opcional)"
-              />
-            </div>
+      <div class="cadastro-form">
+        <img src="/Imagens/E__3_-removebg-preview (1).png" alt="Logo da Empresa" />
+        <h3>Não possui acesso ainda?</h3>
+        <button @click="showCadastroModal = true">Enviar E-mail</button>
+      </div>
 
-            <div class="form-group">
-              <label for="motivo-solicitacao">Motivo da Solicitação</label>
-              <textarea
-                id="motivo-solicitacao"
-                v-model="motivoSolicitacao"
-                :disabled="isLoadingSolicitacao"
-                placeholder="Descreva o motivo da sua solicitação de acesso (opcional)"
-                rows="4"
-              ></textarea>
-            </div>
-
-            <div class="modal-actions">
-              <button
-                type="button"
-                @click="fecharModalCadastro"
-                class="btn-cancelar"
-                :disabled="isLoadingSolicitacao"
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                class="btn-enviar"
-                :disabled="isLoadingSolicitacao || !email.trim()"
-              >
-                <span v-if="isLoadingSolicitacao">Enviando...</span>
-                <span v-else>Enviar Solicitação</span>
-              </button>
-            </div>
-          </form>
+      <div v-if="showCadastroModal" class="modal-overlay" @click.self="fecharModalCadastro">
+        <div class="modal-content" @click.stop>
+          <div class="modal-header">
+            <h2>Solicitar Cadastro</h2>
+            <button @click="fecharModalCadastro" class="close-btn">&times;</button>
+          </div>
+          <div class="modal-body">
+            <p class="modal-description">
+              Seu email não está cadastrado no sistema. Preencha os dados abaixo para solicitar
+              acesso.
+            </p>
+            <div v-if="errorSolicitacao" class="error-message-modal">{{ errorSolicitacao }}</div>
+            <div v-if="successMessage" class="success-message-modal">{{ successMessage }}</div>
+            <form @submit.prevent="enviarSolicitacaoCadastro">
+              <div class="form-group">
+                <label for="email-solicitacao">E-mail *</label>
+                <input
+                  type="email"
+                  id="email-solicitacao"
+                  v-model="email"
+                  required
+                  :disabled="isLoadingSolicitacao"
+                  placeholder="seu@email.com"
+                />
+              </div>
+              <div class="form-group">
+                <label for="nome-solicitacao">Nome Completo</label>
+                <input
+                  type="text"
+                  id="nome-solicitacao"
+                  v-model="nomeSolicitacao"
+                  :disabled="isLoadingSolicitacao"
+                  placeholder="Seu nome completo (opcional)"
+                />
+              </div>
+              <div class="form-group">
+                <label for="motivo-solicitacao">Motivo da Solicitação</label>
+                <textarea
+                  id="motivo-solicitacao"
+                  v-model="motivoSolicitacao"
+                  :disabled="isLoadingSolicitacao"
+                  placeholder="Descreva o motivo..."
+                  rows="4"
+                ></textarea>
+              </div>
+              <div class="modal-actions">
+                <button
+                  type="button"
+                  @click="fecharModalCadastro"
+                  class="btn-cancelar"
+                  :disabled="isLoadingSolicitacao"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  class="btn-enviar"
+                  :disabled="isLoadingSolicitacao || !email.trim()"
+                >
+                  <span v-if="isLoadingSolicitacao">Enviando...</span>
+                  <span v-else>Enviar Solicitação</span>
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       </div>
     </div>
@@ -437,13 +414,11 @@ function recuperarSenha() {
   border-left: 5px solid #d32f2f;
 }
 
-
 .toast-content {
   display: flex;
   flex-direction: column;
   flex: 1;
 }
-
 
 .toast-message {
   font-size: 0.95rem;
@@ -612,7 +587,6 @@ function recuperarSenha() {
   background-color: #1a3a11;
   transform: translateY(-2px);
 }
-
 
 .buttonentre:disabled {
   background-color: #ccc;
